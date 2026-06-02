@@ -1,0 +1,110 @@
+/* ===== Tigabelas — Kalender Kegiatan ===== */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar — monochrome */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(212 212 212) transparent;
+}
+.dark * {
+  scrollbar-color: rgb(64 64 64) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(212 212 212);
+  border-radius: 9999px;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgb(64 64 64);
+}
+
+/* Modal animations */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-fade-in {
+  animation: fade-in 0.18s ease-out;
+}
+.animate-pop-in {
+  animation: pop-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Toast */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.toast {
+  animation: toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Hide number input spinners (kept clean) */
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0);
+  opacity: 0.5;
+  cursor: pointer;
+}
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Focus ring consistency */
+:focus-visible {
+  outline: none;
+}
+
+/* ===== Receipt ===== */
+/* 3D faces: front & back */
+.receipt-face {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.receipt-back {
+  transform: rotateY(180deg);
+}
+
+/* Torn paper edges (zigzag) top & bottom */
+.receipt-paper {
+  --s: 11px; /* ukuran gerigi */
+  -webkit-mask:
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--s) var(--s) repeat-x,
+    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--s) var(--s) repeat-x,
+    linear-gradient(#000 0 0) center / 100% calc(100% - 2 * var(--s)) no-repeat;
+  mask:
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--s) var(--s) repeat-x,
+    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--s) var(--s) repeat-x,
+    linear-gradient(#000 0 0) center / 100% calc(100% - 2 * var(--s)) no-repeat;
+}
+
+.receipt-barcode {
+  height: 40px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #000 0, #000 2px, #fff 2px, #fff 4px,
+    #000 4px, #000 5px, #fff 5px, #fff 9px,
+    #000 9px, #000 12px, #fff 12px, #fff 14px
+  );
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}

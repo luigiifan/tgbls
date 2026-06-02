@@ -1,0 +1,1350 @@
+/* ============================================================
+   Tigabelas — Kalender Kegiatan
+   Vanilla JS · localStorage · Leaflet (OSM) · tanpa build step
+   ============================================================ */
+(function () {
+  'use strict';
+
+  /* ---------- Konstanta ---------- */
+  const USERS = { L: '1305', F: '1304' };
+  const NAMES = { L: 'Luigi', F: 'Fany' };   // display names
+  const KEY_EVENTS = 'tigabelas.events.v1';
+  const KEY_THEME = 'tigabelas.theme';
+  const KEY_SESSION = 'tigabelas.session';
+  const KEY_TAGS = 'tigabelas.tags.v1';
+
+  // Home point — used to compute distance. Change here if needed.
+  const HOME = { name: 'Sidoarjo', lat: -7.4478, lng: 112.7183 };
+
+  // Collapsed height of the stats card grid — change this value to adjust it.
+  const STATS_COLLAPSED_HEIGHT = '120px';
+
+  const MONTHS = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  const WEEKDAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  const DEFAULT_TAGS = [
+    { id: 'tg-film', name: 'Movie', kuliner: false },
+    { id: 'tg-kuliner', name: 'Food', kuliner: true },
+    { id: 'tg-jalan', name: 'Outing', kuliner: false },
+    { id: 'tg-belanja', name: 'Shopping', kuliner: false },
+    { id: 'tg-olahraga', name: 'Sport', kuliner: false },
+  ];
+
+  /* ---------- State ---------- */
+  let viewYear, viewMonth;       // bulan yang sedang ditampilkan (month 0-indexed)
+  let events = [];               // daftar kegiatan
+  let tags = [];                 // daftar tag tersedia
+  let currentUser = null;        // 'L' | 'F' | null
+  let selectedDate = null;       // 'YYYY-MM-DD' untuk day modal
+  let loggingIn = false;         // true while the 5s login loader runs
+  let statsExpanded = false;     // state expand/collapse statistik
+  let countdownTarget = null;    // timestamp (ms) event terdekat untuk countdown live
+  let upcomingPage = 0;          // halaman aktif daftar kegiatan mendatang
+
+  // State form kegiatan
+  let formTags = [];             // id tag terpilih
+  let formLocation = null;       // { name, lat, lng } | null
+  let formTimeline = [];         // [{ time, title }]
+
+  // Leaflet
+  let leafletMap = null, leafletMarker = null, mapTempLocation = null;
+  let mapTarget = { type: 'event' };   // sasaran lokasi: { type:'event' } | { type:'timeline', index }
+
+  // Receipt 3D view (default: menghadap lurus depan, zoom sedikit kecil)
+  const view3d = { rx: 0, ry: 0, scale: 0.85, dragging: false, lx: 0, ly: 0 };
+
+  /* ---------- Element refs ---------- */
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    themeToggle: $('themeToggle'), iconSun: $('iconSun'), iconMoon: $('iconMoon'),
+    loginBtn: $('loginBtn'), userBox: $('userBox'), userLabel: $('userLabel'),
+    userAvatar: $('userAvatar'), logoutBtn: $('logoutBtn'),
+    monthTitle: $('monthTitle'), todayBtn: $('todayBtn'), countdownText: $('countdownText'),
+    prevBtn: $('prevBtn'), nextBtn: $('nextBtn'),
+    weekdayRow: $('weekdayRow'), calendarGrid: $('calendarGrid'),
+    upcomingList: $('upcomingList'), upcomingCount: $('upcomingCount'), upcomingPager: $('upcomingPager'),
+    statsGrid: $('statsGrid'), statsFade: $('statsFade'), statsToggleWrap: $('statsToggleWrap'),
+    calendarCard: $('calendarCard'), sidebar: $('sidebar'),
+    openReceiptBtn: $('openReceiptBtn'),
+    // receipt modal
+    receiptModal: $('receiptModal'), receiptStage: $('receiptStage'), receiptArea: $('receiptArea'), receiptFront: $('receiptFront'), receiptBody: $('receiptBody'), downloadReceiptBtn: $('downloadReceiptBtn'),
+    // detail modal
+    detailModal: $('detailModal'), detailTitle: $('detailTitle'), detailDate: $('detailDate'),
+    detailBody: $('detailBody'), detailFooter: $('detailFooter'),
+    // login modal
+    loginModal: $('loginModal'), loginForm: $('loginForm'), loginError: $('loginError'),
+    loginLoading: $('loginLoading'), loginRing: $('loginRing'), loginRingPct: $('loginRingPct'),
+    // day modal
+    dayModal: $('dayModal'), dayModalWeekday: $('dayModalWeekday'),
+    dayModalTitle: $('dayModalTitle'), dayModalList: $('dayModalList'),
+    dayModalFooter: $('dayModalFooter'),
+    // event modal
+    eventModal: $('eventModal'), eventForm: $('eventForm'),
+    eventModalTitle: $('eventModalTitle'), eventId: $('eventId'),
+    eventTitle: $('eventTitle'), eventDate: $('eventDate'), eventDesc: $('eventDesc'),
+    tagPicker: $('tagPicker'), locationBox: $('locationBox'), timelineEditor: $('timelineEditor'),
+    manageTagsBtn: $('manageTagsBtn'), addTimelineBtn: $('addTimelineBtn'),
+    // tag modal
+    tagModal: $('tagModal'), tagManagerList: $('tagManagerList'),
+    newTagName: $('newTagName'), addTagBtn: $('addTagBtn'),
+    // map modal
+    mapModal: $('mapModal'), mapSearch: $('mapSearch'), mapSearchBtn: $('mapSearchBtn'),
+    mapSelInfo: $('mapSelInfo'), useLocationBtn: $('useLocationBtn'),
+    toastContainer: $('toastContainer'),
+  };
+
+  /* ---------- Util tanggal ---------- */
+  const pad = (n) => String(n).padStart(2, '0');
+  function dateKey(d) {
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+  function todayKey() { return dateKey(new Date()); }
+  function parseKey(key) {
+    const [y, m, d] = key.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  function mondayIndex(jsDay) { return (jsDay + 6) % 7; }
+
+  /* ---------- Util umum ---------- */
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  function haversineKm(a, b) {
+    const R = 6371;
+    const toRad = (x) => (x * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const s = Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+  }
+  const fmtNum = (n) => (n % 1 === 0 ? n : Number(n.toFixed(1)));
+  // Force a 24-hour HH:MM mask (no AM/PM). Clamps hours 0-23, minutes 0-59.
+  function maskTime(v) {
+    let d = String(v).replace(/\D/g, '').slice(0, 4);
+    if (d.length >= 2) d = String(Math.min(23, parseInt(d.slice(0, 2), 10))).padStart(2, '0') + d.slice(2);
+    if (d.length >= 4) d = d.slice(0, 2) + String(Math.min(59, parseInt(d.slice(2, 4), 10))).padStart(2, '0');
+    return d.length <= 2 ? d : d.slice(0, 2) + ':' + d.slice(2);
+  }
+  const isValidTime = (t) => /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+
+  /* ---------- Helper kegiatan ---------- */
+  function timelineTimes(ev) {
+    return (ev.timeline || []).map((i) => i.time).filter(Boolean).sort();
+  }
+  function eventStart(ev) {
+    return timelineTimes(ev)[0] || '';
+  }
+  function eventDurationHours(ev) {
+    const t = timelineTimes(ev);
+    if (t.length < 2) return 0;
+    const toMin = (s) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+    return Math.max(0, (toMin(t[t.length - 1]) - toMin(t[0])) / 60);
+  }
+  // Calendar indicator weight: number of timeline items; counts as 1 if no timeline.
+  function eventUnitCount(ev) {
+    const n = (ev.timeline || []).length;
+    return n > 0 ? n : 1;
+  }
+  function dayUnitCount(key) {
+    return eventsForDate(key).reduce((s, ev) => s + eventUnitCount(ev), 0);
+  }
+  // Finished/past event: past date, or today with last timeline time already passed.
+  function isPastEvent(ev) {
+    const tKey = todayKey();
+    if (ev.date < tKey) return true;
+    if (ev.date > tKey) return false;
+    const times = timelineTimes(ev);
+    if (!times.length) return false;
+    const now = new Date();
+    const nowHM = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    return times[times.length - 1] < nowHM;
+  }
+  function sortEvents(a, b) {
+    const ta = eventStart(a), tb = eventStart(b);
+    if (ta && tb) return ta.localeCompare(tb) || a.title.localeCompare(b.title);
+    if (ta) return -1;
+    if (tb) return 1;
+    return a.title.localeCompare(b.title);
+  }
+  function eventsForDate(key) {
+    return events.filter((e) => e.date === key).sort(sortEvents);
+  }
+  function kulinerTagIds() {
+    return new Set(tags.filter((t) => t.kuliner).map((t) => t.id));
+  }
+  function locationKey(loc) {
+    return `${loc.lat.toFixed(3)},${loc.lng.toFixed(3)}`;
+  }
+
+  /* ---------- Storage ---------- */
+  function loadEvents() {
+    try { events = JSON.parse(localStorage.getItem(KEY_EVENTS)) || []; }
+    catch { events = []; }
+  }
+  function saveEvents() { localStorage.setItem(KEY_EVENTS, JSON.stringify(events)); }
+
+  function loadTags() {
+    try {
+      const raw = localStorage.getItem(KEY_TAGS);
+      tags = raw ? JSON.parse(raw) : DEFAULT_TAGS.slice();
+    } catch { tags = DEFAULT_TAGS.slice(); }
+  }
+  function saveTags() { localStorage.setItem(KEY_TAGS, JSON.stringify(tags)); }
+
+  /* ---------- Tema ---------- */
+  function applyTheme(theme) {
+    const dark = theme === 'dark';
+    document.documentElement.classList.toggle('dark', dark);
+    el.iconSun.classList.toggle('hidden', !dark);
+    el.iconMoon.classList.toggle('hidden', dark);
+    localStorage.setItem(KEY_THEME, theme);
+  }
+  function initTheme() {
+    let theme = localStorage.getItem(KEY_THEME);
+    if (!theme) theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    applyTheme(theme);
+  }
+
+  /* ---------- Sesi / Auth ---------- */
+  function initSession() {
+    const u = localStorage.getItem(KEY_SESSION);
+    currentUser = (u === 'L' || u === 'F') ? u : null;
+    renderAuth();
+  }
+  function renderAuth() {
+    const loggedIn = !!currentUser;
+    el.loginBtn.classList.toggle('hidden', loggedIn);
+    el.userBox.classList.toggle('hidden', !loggedIn);
+    el.userBox.classList.toggle('flex', loggedIn);
+    if (loggedIn) {
+      el.userLabel.textContent = NAMES[currentUser] || currentUser;
+      el.userAvatar.textContent = currentUser;
+    }
+  }
+  function login(user) {
+    currentUser = user;
+    localStorage.setItem(KEY_SESSION, user);
+    renderAuth();
+  }
+  function logout() {
+    currentUser = null;
+    localStorage.removeItem(KEY_SESSION);
+    renderAuth();
+    toast('Signed out');
+  }
+
+  /* ---------- Render kalender ---------- */
+  function renderWeekdays() {
+    el.weekdayRow.innerHTML = WEEKDAYS_SHORT.map((d) => `<div class="py-2">${d}</div>`).join('');
+  }
+
+  function renderCalendar() {
+    el.monthTitle.textContent = `${MONTHS[viewMonth]} ${viewYear}`;
+
+    const firstOfMonth = new Date(viewYear, viewMonth, 1);
+    const lead = mondayIndex(firstOfMonth.getDay());
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const totalCells = Math.ceil((lead + daysInMonth) / 7) * 7;
+    const tKey = todayKey();
+
+    let html = '';
+    for (let i = 0; i < totalCells; i++) {
+      const dayNum = i - lead + 1;
+      const inMonth = dayNum >= 1 && dayNum <= daysInMonth;
+
+      if (!inMonth) {
+        html += `<div class="aspect-square rounded-xl border border-transparent"></div>`;
+        continue;
+      }
+
+      const key = dateKey(new Date(viewYear, viewMonth, dayNum));
+      const isToday = key === tKey;
+      const count = dayUnitCount(key);
+
+      const numClass = isToday
+        ? 'flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-xs font-bold text-white dark:bg-white dark:text-neutral-900'
+        : 'flex h-7 w-7 items-center justify-center text-sm font-semibold text-neutral-600 dark:text-neutral-300';
+
+      const ringClass = isToday
+        ? 'border-neutral-900 dark:border-white'
+        : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700';
+
+      // indikator jumlah event — pill di bawah tengah
+      const badge = count
+        ? `<span class="rounded-full bg-neutral-100 px-3.5 py-0.5 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">${count}</span>`
+        : '<span class="h-[18px]"></span>';
+
+      html += `
+        <button type="button" data-day="${key}"
+          class="group aspect-square flex flex-col items-center justify-between rounded-xl border ${ringClass} bg-white p-1.5 text-center transition hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/50 sm:p-2">
+          <span class="${numClass}">${dayNum}</span>
+          ${badge}
+        </button>`;
+    }
+
+    el.calendarGrid.innerHTML = html;
+  }
+
+  function upcomingItemHTML(ev) {
+    const d = parseKey(ev.date);
+    const past = ev.date < todayKey();
+    const times = timelineTimes(ev);
+    const range = times.length >= 2 ? `${times[0]} - ${times[times.length - 1]}` : (times[0] || '');
+    return `
+      <button type="button" data-day="${ev.date}"
+        class="flex w-full items-stretch gap-3 rounded-xl border border-neutral-200 p-3 text-left transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50 ${past ? 'opacity-50' : ''}">
+        <div class="flex w-11 flex-shrink-0 flex-col items-center justify-center rounded-lg bg-neutral-900 py-1 text-white dark:bg-white dark:text-neutral-900">
+          <span class="text-base font-bold leading-none">${d.getDate()}</span>
+          <span class="mt-0.5 text-[10px] font-medium uppercase">${MONTHS[d.getMonth()].slice(0, 3)}</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-sm font-semibold">${escapeHtml(ev.title)}</p>
+          <div class="mt-0.5 flex items-center justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+            <span class="truncate">${WEEKDAYS_LONG[d.getDay()]}</span>
+            ${range ? `<span class="flex-shrink-0 tabular-nums">${range}</span>` : ''}
+          </div>
+        </div>
+        <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center self-start rounded-full border border-neutral-300 text-[10px] font-bold text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">${ev.owner}</span>
+      </button>`;
+  }
+
+  // Samakan tinggi sidebar dengan tinggi card kalender (khusus layar lebar).
+  function syncSidebarHeight(isLarge) {
+    if (isLarge && el.calendarCard) {
+      el.sidebar.style.height = el.calendarCard.offsetHeight + 'px';
+    } else {
+      el.sidebar.style.height = '';
+    }
+  }
+
+  function renderUpcoming() {
+    const prefix = `${viewYear}-${pad(viewMonth + 1)}-`;
+    const list = events
+      .filter((e) => e.date.startsWith(prefix))
+      .sort((a, b) => (a.date === b.date ? sortEvents(a, b) : a.date.localeCompare(b.date)));
+
+    el.upcomingCount.textContent = String(list.length);
+
+    const isLarge = window.matchMedia('(min-width: 1024px)').matches;
+    syncSidebarHeight(isLarge);
+
+    const hidePager = () => { el.upcomingPager.classList.add('hidden'); el.upcomingPager.classList.remove('flex'); el.upcomingPager.innerHTML = ''; };
+
+    if (!list.length) {
+      el.upcomingList.innerHTML = `
+        <div class="rounded-xl border border-dashed border-neutral-200 p-6 text-center dark:border-neutral-800">
+          <p class="text-sm text-neutral-500 dark:text-neutral-400">No events this month.</p>
+        </div>`;
+      hidePager();
+      return;
+    }
+
+    // Maks 4 event per halaman; bila card pendek, daftar bisa di-scroll (lihat class lg:overflow-y-auto).
+    const PER_PAGE = 4;
+    const totalPages = Math.ceil(list.length / PER_PAGE);
+    upcomingPage = Math.min(Math.max(upcomingPage, 0), totalPages - 1);
+    const start = upcomingPage * PER_PAGE;
+    el.upcomingList.innerHTML = list.slice(start, start + PER_PAGE).map(upcomingItemHTML).join('');
+
+    if (totalPages <= 1) { hidePager(); return; }
+
+    el.upcomingPager.classList.remove('hidden');
+    el.upcomingPager.classList.add('flex');
+    const navBtn = (data, dis, svg) =>
+      `<button type="button" ${data} ${dis ? 'disabled' : ''}
+        class="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 transition hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent dark:border-neutral-800 dark:hover:bg-neutral-800">${svg}</button>`;
+    el.upcomingPager.innerHTML = `
+      ${navBtn('data-up-prev', upcomingPage === 0, '<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>')}
+      <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">${upcomingPage + 1} / ${totalPages}</span>
+      ${navBtn('data-up-next', upcomingPage === totalPages - 1, '<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>')}`;
+  }
+
+  /* ---------- Statistik tahunan ---------- */
+  function getYearStats(year) {
+    const yr = events.filter((e) => e.date.startsWith(year + '-'));
+    const kSet = kulinerTagIds();
+    const withLoc = yr.filter((e) => e.location);
+    return {
+      count: yr.length,
+      days: new Set(yr.map((e) => e.date)).size,
+      hours: yr.reduce((s, e) => s + eventDurationHours(e), 0),
+      kuliner: yr.filter((e) => (e.tags || []).some((id) => kSet.has(id))).length,
+      places: new Set(withLoc.map((e) => locationKey(e.location))).size,
+      distance: withLoc.reduce((s, e) => s + haversineKm(HOME, e.location), 0),
+    };
+  }
+
+  function renderStats() {
+    const st = getYearStats(String(viewYear));
+    // angka + unit sebagai suffix kecil
+    const unit = (n, u) => `${n}<span class="ml-0.5 text-sm font-semibold text-neutral-400 dark:text-neutral-500">${u}</span>`;
+
+    const STATS = [
+      { label: 'Total Days', value: st.days,
+        icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />' },
+      { label: 'Total Hours', value: unit(fmtNum(st.hours), 'hrs'),
+        icon: '<circle cx="12" cy="12" r="9" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3" />' },
+      { label: 'Total Photos', value: '—',  // function coming later (photo album)
+        icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />' },
+      { label: 'Total Places', value: st.places,
+        icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z" /><circle cx="12" cy="10" r="2.5" />' },
+      { label: 'Total Food', value: st.kuliner,
+        icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3" />' },
+      { label: 'Total Distance', value: unit(fmtNum(st.distance), 'km'),
+        icon: '<circle cx="5" cy="18" r="3" /><circle cx="19" cy="6" r="3" /><path stroke-linecap="round" d="M19 9V15a2 2 0 0 1-2 2H8m0 0 3-3m-3 3 3 3" />' },
+    ];
+
+    el.statsGrid.innerHTML = STATS.map((s) => `
+      <div class="flex flex-col gap-1.5 rounded-xl bg-neutral-50 p-3 dark:bg-neutral-800/50">
+        <div class="flex items-center gap-1.5 text-neutral-400 dark:text-neutral-500">
+          <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">${s.icon}</svg>
+          <span class="text-[11px] leading-tight text-neutral-500 dark:text-neutral-400">${s.label}</span>
+        </div>
+        <p class="text-xl font-bold leading-none">${s.value}</p>
+      </div>`).join('');
+
+    // collapsed: show top rows + a peek via the gradient (height = STATS_COLLAPSED_HEIGHT)
+    el.statsGrid.style.maxHeight = statsExpanded ? '' : STATS_COLLAPSED_HEIGHT;
+    el.statsGrid.classList.toggle('overflow-hidden', !statsExpanded);
+    el.statsFade.classList.toggle('hidden', statsExpanded);
+
+    const chevDown = '<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>';
+    const chevUp = '<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18 15l-6-6-6 6"/></svg>';
+    el.statsToggleWrap.innerHTML = `
+      <button type="button" id="statsToggleBtn"
+        class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-white">
+        ${statsExpanded ? 'Show less ' + chevUp : 'Show all ' + chevDown}
+      </button>`;
+  }
+
+  /* ---------- Struk statistik (receipt) ---------- */
+  function renderReceipt() {
+    const year = viewYear;
+    const st = getYearStats(String(year));
+    const now = new Date();
+    const printed = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const ref = `TGBLS-${year}-${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+
+    const rows = [
+      ['Total Days', st.days],
+      ['Total Hours', fmtNum(st.hours) + ' hrs'],
+      ['Total Photos', '-'],
+      ['Total Places', st.places],
+      ['Total Food', st.kuliner],
+      ['Total Distance', fmtNum(st.distance) + ' km'],
+    ];
+    const line = (l, v) => `
+      <div class="flex items-end gap-1">
+        <span class="whitespace-nowrap">${l}</span>
+        <span class="mb-[3px] flex-1 border-b border-dotted border-neutral-400"></span>
+        <span class="whitespace-nowrap font-bold">${v}</span>
+      </div>`;
+
+    el.receiptBody.innerHTML = `
+      <div class="text-center">
+        <p class="text-xl font-bold tracking-[0.25em]">TIGABELAS</p>
+        <p class="text-[11px] tracking-wide">www.tgbls.com</p>
+      </div>
+      <div class="my-3 border-t border-dashed border-neutral-400"></div>
+      <p class="text-center text-[11px] leading-relaxed">
+        STATISTICS RECEIPT<br/>YEAR ${year}<br/>Date: ${printed}
+      </p>
+      <div class="my-3 border-t border-double border-neutral-500"></div>
+      <div class="space-y-1.5 text-[13px]">${rows.map((r) => line(r[0], r[1])).join('')}</div>
+      <div class="my-3 border-t border-dashed border-neutral-400"></div>
+      <div class="text-[13px]">${line('TOTAL EVENTS', st.count)}</div>
+      <div class="my-3 border-t border-double border-neutral-500"></div>
+      <p class="text-center text-[11px] tracking-[0.2em]">*** THANK YOU ***</p>
+      <div class="receipt-barcode mx-auto mt-3 w-3/4"></div>
+      <p class="mt-1.5 text-center text-[10px] tracking-[0.25em]">${ref}</p>`;
+  }
+  function applyReceiptTransform() {
+    el.receiptArea.style.transform =
+      `rotateX(${view3d.rx}deg) rotateY(${view3d.ry}deg) scale(${view3d.scale})`;
+  }
+  function resetReceiptView() {
+    view3d.rx = 0; view3d.ry = 0; view3d.scale = 0.85;
+    applyReceiptTransform();
+  }
+  function openReceipt() {
+    renderReceipt();
+    resetReceiptView();
+    openModal(el.receiptModal);
+  }
+  async function downloadReceipt() {
+    if (typeof html2canvas !== 'function') { toast('Download module not loaded'); return; }
+    const btn = el.downloadReceiptBtn;
+    btn.disabled = true;
+    const savedTransform = el.receiptArea.style.transform;
+    el.receiptArea.style.transform = 'none';   // rata supaya hasil unduh bersih
+    try {
+      const canvas = await html2canvas(el.receiptFront, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
+      const link = document.createElement('a');
+      link.download = `struk-statistik-tigabelas-${viewYear}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      toast('Receipt downloaded');
+    } catch {
+      toast('Failed to download receipt');
+    } finally {
+      el.receiptArea.style.transform = savedTransform;
+      btn.disabled = false;
+    }
+  }
+
+  /* ---------- Countdown live ke event terdekat ---------- */
+  // Timestamp event terdekat di masa depan (tanggal + waktu mulai timeline, atau 00:00).
+  function getNextTarget() {
+    const now = Date.now();
+    let best = null;
+    for (const ev of events) {
+      const [h, m] = (eventStart(ev) || '00:00').split(':').map(Number);
+      const d = parseKey(ev.date); d.setHours(h, m, 0, 0);
+      const t = d.getTime();
+      if (t > now && (best === null || t < best)) best = t;
+    }
+    return best;
+  }
+  function tickCountdown() {
+    let remaining = countdownTarget ? countdownTarget - Date.now() : -1;
+    if (remaining <= 0) {                 // target lewat → cari event berikutnya
+      countdownTarget = getNextTarget();
+      remaining = countdownTarget ? countdownTarget - Date.now() : -1;
+    }
+    if (!countdownTarget || remaining <= 0) {
+      el.countdownText.textContent = 'No upcoming events';
+      return;
+    }
+    const s = Math.floor(remaining / 1000);
+    const days = Math.floor(s / 86400);
+    const hrs = Math.floor((s % 86400) / 3600);
+    const min = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    el.countdownText.textContent = days > 0
+      ? `${days}:${pad(hrs)}:${pad(min)}:${pad(sec)}`
+      : `${pad(hrs)}:${pad(min)}:${pad(sec)}`;
+  }
+  function renderCountdown() {
+    countdownTarget = getNextTarget();
+    tickCountdown();
+  }
+
+  function renderAll() {
+    renderCalendar();
+    renderStats();
+    renderUpcoming();   // setelah kalender & stats agar pengukuran tinggi akurat
+    renderCountdown();
+  }
+
+  /* ---------- Modal helpers ---------- */
+  const MODALS = () => [el.loginModal, el.dayModal, el.detailModal, el.eventModal, el.tagModal, el.mapModal, el.receiptModal];
+  function anyModalOpen() { return MODALS().some((m) => !m.classList.contains('hidden')); }
+  function openModal(m) {
+    m.classList.remove('hidden'); m.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal(m) {
+    m.classList.add('hidden'); m.classList.remove('flex');
+    if (!anyModalOpen()) document.body.style.overflow = '';
+  }
+  function closeModalSmart(m) {
+    closeModal(m);
+    if (m === el.tagModal) { renderTagPicker(); renderAll(); }
+  }
+  function closeTopModal() {
+    for (const m of [el.receiptModal, el.mapModal, el.tagModal, el.eventModal, el.detailModal, el.dayModal, el.loginModal]) {
+      if (!m.classList.contains('hidden')) { closeModalSmart(m); break; }
+    }
+  }
+
+  /* ---------- Login modal ---------- */
+  const otpBoxes = () => Array.from(document.querySelectorAll('.otp-box'));
+  function clearOtp() { otpBoxes().forEach((b) => { b.value = ''; }); }
+  function focusFirstOtp() { const f = otpBoxes()[0]; if (f) f.focus(); }
+  function attemptLogin() {
+    if (loggingIn) return;
+    const code = otpBoxes().map((b) => b.value).join('');
+    if (code.length < 4) return;
+    // determine the user from the code (1305 → Luigi/L, 1304 → Fany/F)
+    const user = Object.keys(USERS).find((k) => USERS[k] === code);
+    if (user) {
+      startLoginLoading(user);
+    } else {
+      el.loginError.classList.remove('hidden');
+      clearOtp();
+      focusFirstOtp();
+    }
+  }
+  // Show a 5-second circular progress, then complete login.
+  function startLoginLoading(user) {
+    loggingIn = true;
+    el.loginForm.classList.add('hidden');
+    el.loginLoading.classList.remove('hidden');
+    el.loginLoading.classList.add('flex');
+    const C = 125.66, dur = 700, t0 = performance.now();
+    (function frame(now) {
+      // cancelled (modal closed)?
+      if (el.loginModal.classList.contains('hidden')) { loggingIn = false; resetLoginView(); return; }
+      const p = Math.min(1, (now - t0) / dur);
+      el.loginRing.style.strokeDashoffset = String(C * (1 - p));
+      el.loginRingPct.textContent = Math.round(p * 100) + '%';
+      if (p < 1) { requestAnimationFrame(frame); return; }
+      loggingIn = false;
+      login(user);
+      closeModal(el.loginModal);
+      toast(`Signed in as ${NAMES[user] || user}`);
+      resetLoginView();
+      if (!el.dayModal.classList.contains('hidden')) { renderDayList(); renderDayFooter(); }
+    })(t0);
+  }
+  function resetLoginView() {
+    el.loginLoading.classList.add('hidden');
+    el.loginLoading.classList.remove('flex');
+    el.loginForm.classList.remove('hidden');
+    el.loginRing.style.strokeDashoffset = '125.66';
+    el.loginRingPct.textContent = '0%';
+  }
+  function openLogin() {
+    loggingIn = false;
+    resetLoginView();
+    clearOtp();
+    el.loginError.classList.add('hidden');
+    openModal(el.loginModal);
+    setTimeout(focusFirstOtp, 50);
+  }
+
+  /* ---------- Day modal ---------- */
+  function openDay(key) {
+    selectedDate = key;
+    const d = parseKey(key);
+    el.dayModalWeekday.textContent = WEEKDAYS_LONG[d.getDay()];
+    el.dayModalTitle.textContent = `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    renderDayList();
+    renderDayFooter();
+    openModal(el.dayModal);
+  }
+
+  function tagNameById(id) {
+    const t = tags.find((x) => x.id === id);
+    return t ? t.name : null;
+  }
+
+  function renderDayList() {
+    const dayEvents = eventsForDate(selectedDate);
+    if (!dayEvents.length) {
+      el.dayModalList.innerHTML = `
+        <div class="rounded-xl border border-dashed border-neutral-200 p-8 text-center dark:border-neutral-800">
+          <p class="text-sm text-neutral-500 dark:text-neutral-400">No events on this day.</p>
+        </div>`;
+      return;
+    }
+
+    const ICON_CLOCK = '<circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 8v4l3 2"/>';
+    const ICON_LIST = '<path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>';
+    const ICON_PIN = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z"/><circle cx="12" cy="10" r="2"/>';
+
+    el.dayModalList.innerHTML = dayEvents.map((ev) => {
+      const past = isPastEvent(ev);
+      const tagChips = (ev.tags || []).map((id) => {
+        const name = tagNameById(id);
+        return name ? `<span class="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">${escapeHtml(name)}</span>` : '';
+      }).join('');
+
+      const times = timelineTimes(ev);
+      const range = times.length >= 2 ? `${times[0]} – ${times[times.length - 1]}` : (times[0] || '');
+      const tlCount = (ev.timeline || []).length;
+      const metaPart = (icon, text) =>
+        `<span class="inline-flex min-w-0 items-center gap-1"><svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">${icon}</svg><span class="truncate">${text}</span></span>`;
+      const meta = [];
+      if (range) meta.push(metaPart(ICON_CLOCK, range));
+      if (tlCount) meta.push(metaPart(ICON_LIST, `${tlCount} Act`));
+      if (ev.location) meta.push(metaPart(ICON_PIN, escapeHtml(ev.location.name)));
+      const metaLine = meta.length
+        ? `<div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500 dark:text-neutral-400">${meta.join('')}</div>` : '';
+
+      // edit & delete only when logged in AND the event is not finished/past
+      const editDel = (currentUser && !past) ? `
+        <button type="button" data-edit="${ev.id}" title="Edit"
+          class="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-white">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4v16h16v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+        </button>
+        <button type="button" data-delete="${ev.id}" title="Delete"
+          class="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-white">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /></svg>
+        </button>` : '';
+
+      // "DONE" rubber stamp (centered) for finished/past events
+      const stamp = past ? `
+        <div class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <span class="-rotate-12 rounded-md border-2 border-neutral-400/70 px-3 py-1 text-base font-extrabold uppercase tracking-[0.2em] text-neutral-400/70 dark:border-neutral-500/70 dark:text-neutral-500/70">Done</span>
+        </div>` : '';
+
+      return `
+        <div class="relative rounded-xl border border-neutral-200 p-3 transition hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700 ${past ? 'opacity-70' : ''}">
+          ${stamp}
+          <div class="flex items-start justify-between gap-2">
+            <button type="button" data-detail="${ev.id}" class="min-w-0 flex-1 text-left">
+              <div class="mb-1 flex flex-wrap items-center gap-1.5">
+                ${tagChips}
+                <span class="flex h-5 w-5 items-center justify-center rounded-full border border-neutral-300 text-[10px] font-bold text-neutral-500 dark:border-neutral-700 dark:text-neutral-400" title="Created by ${ev.owner}">${ev.owner}</span>
+              </div>
+              <p class="font-semibold leading-snug">${escapeHtml(ev.title)}</p>
+              ${metaLine}
+            </button>
+            <div class="flex flex-shrink-0 items-center gap-1">
+              <button type="button" data-detail="${ev.id}" title="View detail"
+                class="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-white">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+              ${editDel}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // Konten detail lengkap satu kegiatan.
+  function eventDetailHTML(ev) {
+    const tagChips = (ev.tags || []).map((id) => {
+      const n = tagNameById(id);
+      return n ? `<span class="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">${escapeHtml(n)}</span>` : '';
+    }).join('') || '<span class="text-sm text-neutral-400">No tags</span>';
+
+    const times = timelineTimes(ev);
+    const range = times.length >= 2 ? `${times[0]} – ${times[times.length - 1]}` : (times[0] || '—');
+    const dur = eventDurationHours(ev);
+    const durTxt = dur ? `${fmtNum(dur)} hrs` : '—';
+    const loc = ev.location
+      ? `${escapeHtml(ev.location.name)} · ~${haversineKm(HOME, ev.location).toFixed(1)} km from ${HOME.name}` : '—';
+
+    const tl = (ev.timeline || []).filter((i) => i.title || i.time);
+    const timeline = tl.length ? `
+      <ol>
+        ${tl.map((i, idx) => {
+          const last = idx === tl.length - 1;
+          const locLine = i.location
+            ? `<div class="mt-0.5 flex items-center gap-1 text-xs text-neutral-400 dark:text-neutral-500"><svg class="h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z"/><circle cx="12" cy="10" r="2"/></svg><span class="truncate">${escapeHtml(i.location.name)}</span></div>`
+            : '';
+          return `
+          <li class="flex gap-3">
+            <div class="flex flex-col items-center">
+              <span class="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-neutral-400 dark:bg-neutral-500"></span>
+              ${last ? '' : '<span class="w-px flex-1 bg-neutral-200 dark:bg-neutral-700"></span>'}
+            </div>
+            <div class="${last ? '' : 'pb-3'} min-w-0 text-sm">
+              <div>${i.time ? `<span class="mr-1.5 font-semibold tabular-nums">${i.time}</span>` : ''}<span class="text-neutral-600 dark:text-neutral-300">${escapeHtml(i.title || '')}</span></div>
+              ${locLine}
+            </div>
+          </li>`;
+        }).join('')}
+      </ol>` : '<p class="text-sm text-neutral-400">No timeline.</p>';
+
+    const desc = ev.desc
+      ? `<p class="whitespace-pre-line text-sm text-neutral-600 dark:text-neutral-300">${escapeHtml(ev.desc)}</p>`
+      : '<p class="text-sm text-neutral-400">—</p>';
+
+    const infoRow = (label, val) =>
+      `<div class="flex justify-between gap-3 text-sm"><span class="flex-shrink-0 text-neutral-500 dark:text-neutral-400">${label}</span><span class="min-w-0 text-right font-medium">${val}</span></div>`;
+
+    return `
+      <div class="space-y-4">
+        <div class="flex flex-wrap items-center gap-1.5">
+          ${tagChips}
+          <span class="ml-auto flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-neutral-300 text-[10px] font-bold text-neutral-500 dark:border-neutral-700 dark:text-neutral-400" title="Created by ${ev.owner}">${ev.owner}</span>
+        </div>
+        <div class="space-y-2 rounded-xl border border-neutral-200 p-3.5 dark:border-neutral-800">
+          ${infoRow('Time', range)}
+          ${infoRow('Duration', durTxt)}
+          ${infoRow('Location', loc)}
+        </div>
+        <div>
+          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Timeline</p>
+          ${timeline}
+        </div>
+        <div>
+          <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Notes</p>
+          ${desc}
+        </div>
+      </div>`;
+  }
+
+  function openDetail(id) {
+    const ev = events.find((e) => e.id === id);
+    if (!ev) return;
+    const d = parseKey(ev.date);
+    el.detailDate.textContent = `${WEEKDAYS_LONG[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    el.detailTitle.textContent = ev.title;
+    el.detailBody.innerHTML = eventDetailHTML(ev);
+    // edit only when logged in AND event not finished/past
+    const editBtn = (currentUser && !isPastEvent(ev))
+      ? `<button type="button" data-edit="${ev.id}"
+          class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4v16h16v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </button>` : '';
+    el.detailFooter.innerHTML = `
+      <button type="button" data-close-modal
+        class="flex-1 rounded-xl border border-neutral-200 py-2.5 text-sm font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+        Close
+      </button>
+      ${editBtn}`;
+    openModal(el.detailModal);
+  }
+
+  function renderDayFooter() {
+    if (currentUser) {
+      el.dayModalFooter.innerHTML = `
+        <button type="button" id="addEventBtn"
+          class="flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14" /></svg>
+          Add Event
+        </button>`;
+    } else {
+      el.dayModalFooter.innerHTML = `
+        <button type="button" id="footerLoginBtn"
+          class="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 py-2.5 text-sm font-semibold text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2" /><path stroke-linecap="round" d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+          Sign in to add / edit
+        </button>`;
+    }
+  }
+
+  /* ---------- Event form: pickers ---------- */
+  function renderTagPicker() {
+    if (!tags.length) {
+      el.tagPicker.innerHTML = `<p class="text-xs text-neutral-400">No tags yet. Click "Manage tags".</p>`;
+      return;
+    }
+    el.tagPicker.innerHTML = tags.map((t) => {
+      const on = formTags.includes(t.id);
+      return `<button type="button" data-tag-toggle="${t.id}"
+        class="rounded-full border px-3 py-1 text-xs font-semibold transition ${on
+          ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+          : 'border-neutral-300 text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300'}">
+        ${escapeHtml(t.name)}</button>`;
+    }).join('');
+  }
+
+  function renderLocationBox() {
+    if (formLocation) {
+      const dist = haversineKm(HOME, formLocation).toFixed(1);
+      el.locationBox.innerHTML = `
+        <div class="flex items-center gap-2 rounded-xl border border-neutral-300 px-3 py-2.5 dark:border-neutral-700">
+          <svg class="h-4 w-4 flex-shrink-0 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm font-medium">${escapeHtml(formLocation.name)}</p>
+            <p class="text-xs text-neutral-400">~${dist} km from ${HOME.name}</p>
+          </div>
+          <button type="button" id="changeLocationBtn" class="flex-shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-neutral-500 transition hover:bg-neutral-100 dark:hover:bg-neutral-800">Change</button>
+          <button type="button" id="clearLocationBtn" title="Remove location" class="flex-shrink-0 rounded-lg p-1 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>`;
+    } else {
+      el.locationBox.innerHTML = `
+        <button type="button" id="pickLocationBtn"
+          class="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 py-2.5 text-sm font-medium text-neutral-500 transition hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          Pick location on map
+        </button>`;
+    }
+  }
+
+  function renderTimelineEditor() {
+    if (!formTimeline.length) {
+      el.timelineEditor.innerHTML = `<p class="text-xs text-neutral-400">No items yet. Add activity steps with their times.</p>`;
+      return;
+    }
+    el.timelineEditor.innerHTML = formTimeline.map((it, i) => `
+      <div class="tl-row rounded-lg border border-neutral-200 p-2 dark:border-neutral-700" data-index="${i}">
+        <div class="flex items-center gap-2">
+          <input type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" value="${escapeHtml(it.time || '')}" data-tl-field="time"
+            class="w-[4.5rem] flex-shrink-0 rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-center text-sm tabular-nums outline-none transition focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white" />
+          <input type="text" value="${escapeHtml(it.title || '')}" data-tl-field="title" placeholder="Activity" maxlength="80"
+            class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white" />
+          <button type="button" data-tl-remove="${i}" title="Remove item"
+            class="flex-shrink-0 rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <div class="mt-2 flex items-center gap-2">
+          <button type="button" data-tl-loc="${i}"
+            class="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-dashed border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-500 transition hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800">
+            <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z"/><circle cx="12" cy="10" r="2.5"/></svg>
+            <span class="truncate">${it.location ? escapeHtml(it.location.name) : 'Add location (optional)'}</span>
+          </button>
+          ${it.location ? `<button type="button" data-tl-loc-clear="${i}" title="Remove location"
+            class="flex-shrink-0 rounded-lg p-1 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white">
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>` : ''}
+        </div>
+      </div>`).join('');
+  }
+  function addTimelineRow() {
+    formTimeline.push({ time: '', title: '', location: null });
+    renderTimelineEditor();
+    const rows = el.timelineEditor.querySelectorAll('.tl-row');
+    const last = rows[rows.length - 1];
+    if (last) last.querySelector('[data-tl-field="time"]').focus();
+  }
+  function removeTimelineRow(i) {
+    formTimeline.splice(i, 1);
+    renderTimelineEditor();
+  }
+
+  /* ---------- Event form modal ---------- */
+  function openEventForm(eventId) {
+    el.eventForm.reset();
+    if (eventId) {
+      const ev = events.find((e) => e.id === eventId);
+      if (!ev) return;
+      el.eventModalTitle.textContent = 'Edit Event';
+      el.eventId.value = ev.id;
+      el.eventTitle.value = ev.title;
+      el.eventDate.value = ev.date;
+      el.eventDesc.value = ev.desc || '';
+      formTags = (ev.tags || []).slice();
+      formLocation = ev.location ? { ...ev.location } : null;
+      formTimeline = (ev.timeline || []).map((i) => ({ ...i }));
+    } else {
+      el.eventModalTitle.textContent = 'Add Event';
+      el.eventId.value = '';
+      el.eventDate.value = selectedDate || todayKey();
+      formTags = [];
+      formLocation = null;
+      formTimeline = [];
+    }
+    renderTagPicker();
+    renderLocationBox();
+    renderTimelineEditor();
+    openModal(el.eventModal);
+    setTimeout(() => el.eventTitle.focus(), 50);
+  }
+
+  function handleEventSubmit(e) {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    const title = el.eventTitle.value.trim();
+    const date = el.eventDate.value;
+    if (!title || !date) return;
+
+    const desc = el.eventDesc.value.trim();
+    const timeline = formTimeline
+      .map((i) => ({ time: maskTime(i.time || ''), title: (i.title || '').trim(), location: i.location || null }))
+      .filter((i) => i.title || i.time);
+    // Times must be a full 24h HH:MM if provided.
+    if (timeline.some((i) => i.time && !isValidTime(i.time))) { toast('Use a full 24h time (HH:MM)'); return; }
+    // Timeline may be empty, but if used it needs at least 2 items.
+    if (timeline.length === 1) { toast('Timeline needs at least 2 items (or leave empty)'); return; }
+    const payload = {
+      title, date, desc,
+      tags: formTags.slice(),
+      location: formLocation,
+      timeline,
+    };
+    const id = el.eventId.value;
+
+    if (id) {
+      const ev = events.find((x) => x.id === id);
+      if (ev) { Object.assign(ev, payload); toast('Event updated'); }
+    } else {
+      events.push({ id: uid(), owner: currentUser, ...payload });
+      toast('Event added');
+    }
+
+    saveEvents();
+    closeModal(el.eventModal);
+
+    selectedDate = date;
+    const d = parseKey(date);
+    viewYear = d.getFullYear();
+    viewMonth = d.getMonth();
+    renderAll();
+
+    if (!el.dayModal.classList.contains('hidden')) openDay(date);
+  }
+
+  function deleteEvent(id) {
+    const ev = events.find((x) => x.id === id);
+    if (!ev) return;
+    if (!window.confirm(`Delete event "${ev.title}"?`)) return;
+    events = events.filter((x) => x.id !== id);
+    saveEvents();
+    renderAll();
+    renderDayList();
+    toast('Event deleted');
+  }
+
+  /* ---------- Tag manager ---------- */
+  function openTagModal() {
+    el.newTagName.value = '';
+    renderTagManager();
+    openModal(el.tagModal);
+  }
+  function renderTagManager() {
+    el.tagManagerList.innerHTML = tags.length ? tags.map((t, i) => `
+      <div class="flex items-center gap-2" data-tag-index="${i}">
+        <input type="text" value="${escapeHtml(t.name)}" data-tag-name maxlength="24"
+          class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white" />
+        <button type="button" data-tag-kuliner title="Count as food"
+          class="flex-shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${t.kuliner
+            ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+            : 'border-neutral-300 text-neutral-500 dark:border-neutral-700 dark:text-neutral-400'}">Food</button>
+        <button type="button" data-tag-del title="Remove tag"
+          class="flex-shrink-0 rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+        </button>
+      </div>`).join('') : `<p class="text-sm text-neutral-400">No tags yet.</p>`;
+  }
+  function addTag() {
+    const name = el.newTagName.value.trim();
+    if (!name) return;
+    tags.push({ id: uid(), name, kuliner: false });
+    saveTags();
+    el.newTagName.value = '';
+    renderTagManager();
+    el.newTagName.focus();
+  }
+
+  /* ---------- Peta (Leaflet) ---------- */
+  function fixLeafletIcons() {
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    });
+  }
+  function ensureMap() {
+    if (leafletMap) return;
+    fixLeafletIcons();
+    leafletMap = L.map('mapContainer').setView([HOME.lat, HOME.lng], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap',
+    }).addTo(leafletMap);
+    leafletMap.on('click', (e) => setMapPoint(e.latlng.lat, e.latlng.lng));
+  }
+  function setMapPoint(lat, lng, name) {
+    mapTempLocation = { lat, lng, name: name || null };
+    if (!leafletMarker) leafletMarker = L.marker([lat, lng]).addTo(leafletMap);
+    else leafletMarker.setLatLng([lat, lng]);
+    updateMapInfo();
+    if (!name) reverseGeocode(lat, lng);
+  }
+  function updateMapInfo() {
+    if (!mapTempLocation) {
+      el.mapSelInfo.textContent = 'Click on the map or search to pick a location.';
+      return;
+    }
+    const dist = haversineKm(HOME, mapTempLocation).toFixed(1);
+    el.mapSelInfo.textContent = `${mapTempLocation.name || 'Loading location name…'} · ~${dist} km from ${HOME.name}`;
+  }
+  async function reverseGeocode(lat, lng) {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+        { headers: { Accept: 'application/json' } });
+      const j = await r.json();
+      if (mapTempLocation && mapTempLocation.lat === lat && mapTempLocation.lng === lng) {
+        mapTempLocation.name = j.display_name
+          ? j.display_name.split(',').slice(0, 2).join(',').trim()
+          : `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+        updateMapInfo();
+      }
+    } catch {
+      if (mapTempLocation) { mapTempLocation.name = `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`; updateMapInfo(); }
+    }
+  }
+  async function searchPlace(q) {
+    if (!q.trim()) return;
+    el.mapSearchBtn.disabled = true;
+    el.mapSearchBtn.textContent = '…';
+    /* label restored in finally */
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`,
+        { headers: { Accept: 'application/json' } });
+      const j = await r.json();
+      if (j && j[0]) {
+        const lat = parseFloat(j[0].lat), lng = parseFloat(j[0].lon);
+        const name = j[0].display_name ? j[0].display_name.split(',').slice(0, 2).join(',').trim() : q;
+        leafletMap.setView([lat, lng], 15);
+        setMapPoint(lat, lng, name);
+      } else {
+        toast('Location not found');
+      }
+    } catch {
+      toast('Search failed');
+    } finally {
+      el.mapSearchBtn.disabled = false;
+      el.mapSearchBtn.textContent = 'Search';
+    }
+  }
+  function openMapModal(target) {
+    mapTarget = target || { type: 'event' };
+    const existing = mapTarget.type === 'timeline'
+      ? (formTimeline[mapTarget.index] && formTimeline[mapTarget.index].location)
+      : formLocation;
+    mapTempLocation = existing ? { ...existing } : null;
+    el.mapSearch.value = '';
+    openModal(el.mapModal);
+    setTimeout(() => {
+      ensureMap();
+      leafletMap.invalidateSize();
+      if (mapTempLocation) {
+        if (!leafletMarker) leafletMarker = L.marker([mapTempLocation.lat, mapTempLocation.lng]).addTo(leafletMap);
+        else leafletMarker.setLatLng([mapTempLocation.lat, mapTempLocation.lng]);
+        leafletMap.setView([mapTempLocation.lat, mapTempLocation.lng], 14);
+      } else {
+        if (leafletMarker) { leafletMap.removeLayer(leafletMarker); leafletMarker = null; }
+        leafletMap.setView([HOME.lat, HOME.lng], 12);
+      }
+      updateMapInfo();
+    }, 80);
+  }
+  function applyMapLocation() {
+    if (!mapTempLocation) { toast('No location selected'); return; }
+    const loc = {
+      name: mapTempLocation.name || `Location (${mapTempLocation.lat.toFixed(4)}, ${mapTempLocation.lng.toFixed(4)})`,
+      lat: mapTempLocation.lat,
+      lng: mapTempLocation.lng,
+    };
+    if (mapTarget.type === 'timeline' && formTimeline[mapTarget.index]) {
+      formTimeline[mapTarget.index].location = loc;
+      renderTimelineEditor();
+    } else {
+      formLocation = loc;
+      renderLocationBox();
+    }
+    closeModal(el.mapModal);
+  }
+
+  /* ---------- Toast ---------- */
+  function toast(message) {
+    const t = document.createElement('div');
+    t.className = 'toast pointer-events-auto rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-neutral-900';
+    t.textContent = message;
+    el.toastContainer.appendChild(t);
+    setTimeout(() => {
+      t.style.transition = 'opacity 0.3s, transform 0.3s';
+      t.style.opacity = '0';
+      t.style.transform = 'translateY(8px)';
+      setTimeout(() => t.remove(), 300);
+    }, 2200);
+  }
+
+  /* ---------- Navigasi bulan ---------- */
+  function changeMonth(delta) {
+    viewMonth += delta;
+    if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+    else if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+    upcomingPage = 0;
+    renderAll();
+  }
+  function goToday() {
+    const now = new Date();
+    upcomingPage = 0;
+    viewYear = now.getFullYear();
+    viewMonth = now.getMonth();
+    renderAll();
+  }
+
+  /* ---------- Event listeners ---------- */
+  function bindEvents() {
+    el.themeToggle.addEventListener('click', () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      applyTheme(isDark ? 'light' : 'dark');
+    });
+
+    el.loginBtn.addEventListener('click', openLogin);
+    el.logoutBtn.addEventListener('click', logout);
+
+    el.prevBtn.addEventListener('click', () => changeMonth(-1));
+    el.nextBtn.addEventListener('click', () => changeMonth(1));
+    el.todayBtn.addEventListener('click', goToday);
+
+    // tombol statis di dalam form / modal
+    el.manageTagsBtn.addEventListener('click', openTagModal);
+    el.addTimelineBtn.addEventListener('click', addTimelineRow);
+    el.addTagBtn.addEventListener('click', addTag);
+    el.newTagName.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } });
+    el.mapSearchBtn.addEventListener('click', () => searchPlace(el.mapSearch.value));
+    el.mapSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); searchPlace(el.mapSearch.value); } });
+    el.useLocationBtn.addEventListener('click', applyMapLocation);
+    el.openReceiptBtn.addEventListener('click', openReceipt);
+    el.downloadReceiptBtn.addEventListener('click', downloadReceipt);
+
+    // interaksi 3D struk: seret untuk putar, scroll untuk zoom, klik dua kali reset
+    el.receiptStage.addEventListener('pointerdown', (e) => {
+      view3d.dragging = true; view3d.lx = e.clientX; view3d.ly = e.clientY;
+      el.receiptStage.style.cursor = 'grabbing';
+      el.receiptStage.setPointerCapture(e.pointerId);
+    });
+    el.receiptStage.addEventListener('pointermove', (e) => {
+      if (!view3d.dragging) return;
+      view3d.ry += (e.clientX - view3d.lx) * 0.4;
+      view3d.rx -= (e.clientY - view3d.ly) * 0.4;
+      view3d.rx = Math.max(-80, Math.min(80, view3d.rx));
+      view3d.lx = e.clientX; view3d.ly = e.clientY;
+      applyReceiptTransform();
+    });
+    const endDrag = () => { view3d.dragging = false; el.receiptStage.style.cursor = 'grab'; };
+    el.receiptStage.addEventListener('pointerup', endDrag);
+    el.receiptStage.addEventListener('pointercancel', endDrag);
+    el.receiptStage.addEventListener('pointerleave', endDrag);
+    el.receiptStage.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      view3d.scale *= e.deltaY < 0 ? 1.1 : 0.9;
+      view3d.scale = Math.max(0.4, Math.min(3.5, view3d.scale));
+      applyReceiptTransform();
+    }, { passive: false });
+    el.receiptStage.addEventListener('dblclick', resetReceiptView);
+
+    // kotak kode OTP: auto-maju, backspace mundur, auto-submit saat 4 terisi
+    const boxes = otpBoxes();
+    boxes.forEach((box, idx) => {
+      box.addEventListener('input', () => {
+        box.value = box.value.replace(/\D/g, '').slice(0, 1);
+        el.loginError.classList.add('hidden');
+        if (box.value && idx < boxes.length - 1) boxes[idx + 1].focus();
+        if (boxes.every((b) => b.value)) attemptLogin();
+      });
+      box.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !box.value && idx > 0) { boxes[idx - 1].focus(); }
+      });
+    });
+
+    // login submit (tombol Masuk)
+    el.loginForm.addEventListener('submit', (e) => { e.preventDefault(); attemptLogin(); });
+
+    el.eventForm.addEventListener('submit', handleEventSubmit);
+
+    // klik global (delegation)
+    document.addEventListener('click', (e) => {
+      const dayBtn = e.target.closest('[data-day]');
+      if (dayBtn) { openDay(dayBtn.dataset.day); return; }
+
+      const detBtn = e.target.closest('[data-detail]');
+      if (detBtn) { openDetail(detBtn.dataset.detail); return; }
+
+      const editBtn = e.target.closest('[data-edit]');
+      if (editBtn) {
+        if (!el.detailModal.classList.contains('hidden')) closeModal(el.detailModal);
+        openEventForm(editBtn.dataset.edit);
+        return;
+      }
+
+      const delBtn = e.target.closest('[data-delete]');
+      if (delBtn) { deleteEvent(delBtn.dataset.delete); return; }
+
+      // statistik (expand mengubah ruang → hitung ulang paginasi)
+      if (e.target.closest('#statsToggleBtn')) { statsExpanded = !statsExpanded; renderStats(); renderUpcoming(); return; }
+
+      // paginasi kegiatan mendatang
+      if (e.target.closest('[data-up-prev]')) { if (upcomingPage > 0) { upcomingPage--; renderUpcoming(); } return; }
+      if (e.target.closest('[data-up-next]')) { upcomingPage++; renderUpcoming(); return; }
+
+      // day modal footer
+      if (e.target.closest('#addEventBtn')) { openEventForm(null); return; }
+      if (e.target.closest('#footerLoginBtn')) { openLogin(); return; }
+
+      // tag picker (form)
+      const tg = e.target.closest('[data-tag-toggle]');
+      if (tg) {
+        const id = tg.dataset.tagToggle;
+        const idx = formTags.indexOf(id);
+        if (idx >= 0) formTags.splice(idx, 1); else formTags.push(id);
+        renderTagPicker();
+        return;
+      }
+
+      // timeline
+      const tlDel = e.target.closest('[data-tl-remove]');
+      if (tlDel) { removeTimelineRow(Number(tlDel.dataset.tlRemove)); return; }
+      const tlLocClear = e.target.closest('[data-tl-loc-clear]');
+      if (tlLocClear) { const i = Number(tlLocClear.dataset.tlLocClear); if (formTimeline[i]) { formTimeline[i].location = null; renderTimelineEditor(); } return; }
+      const tlLoc = e.target.closest('[data-tl-loc]');
+      if (tlLoc) { openMapModal({ type: 'timeline', index: Number(tlLoc.dataset.tlLoc) }); return; }
+
+      // lokasi event
+      if (e.target.closest('#pickLocationBtn') || e.target.closest('#changeLocationBtn')) { openMapModal({ type: 'event' }); return; }
+      if (e.target.closest('#clearLocationBtn')) { formLocation = null; renderLocationBox(); return; }
+
+      // tag manager
+      const tDel = e.target.closest('[data-tag-del]');
+      if (tDel) {
+        const i = Number(tDel.closest('[data-tag-index]').dataset.tagIndex);
+        tags.splice(i, 1); saveTags(); renderTagManager();
+        return;
+      }
+      const tKul = e.target.closest('[data-tag-kuliner]');
+      if (tKul) {
+        const i = Number(tKul.closest('[data-tag-index]').dataset.tagIndex);
+        tags[i].kuliner = !tags[i].kuliner; saveTags(); renderTagManager();
+        return;
+      }
+
+      // tutup modal
+      const closeBtn = e.target.closest('[data-close-modal]');
+      if (closeBtn) { const m = closeBtn.closest('.modal-root'); if (m) closeModalSmart(m); return; }
+      if (e.target.classList.contains('modal-backdrop')) { closeModalSmart(e.target.parentElement); return; }
+    });
+
+    // edit nama tag / field timeline (tanpa re-render agar fokus tidak hilang)
+    document.addEventListener('input', (e) => {
+      const nameEl = e.target.closest('[data-tag-name]');
+      if (nameEl) {
+        const i = Number(nameEl.closest('[data-tag-index]').dataset.tagIndex);
+        tags[i].name = nameEl.value;
+        saveTags();
+        return;
+      }
+      const tlField = e.target.closest('[data-tl-field]');
+      if (tlField) {
+        const row = tlField.closest('.tl-row');
+        const i = Number(row.dataset.index);
+        if (tlField.dataset.tlField === 'time') tlField.value = maskTime(tlField.value);  // enforce 24h
+        if (formTimeline[i]) formTimeline[i][tlField.dataset.tlField] = tlField.value;
+      }
+    });
+
+    // ESC menutup modal teratas
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeTopModal();
+    });
+
+    // hitung ulang tinggi sidebar & paginasi saat ukuran layar berubah
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(renderUpcoming, 150);
+    });
+    // setelah semua aset (Tailwind/font) selesai → ukuran final, hitung ulang
+    window.addEventListener('load', () => renderUpcoming());
+  }
+
+  /* ---------- Init ---------- */
+  function init() {
+    initTheme();
+    loadEvents();
+    loadTags();
+    initSession();
+    goToday();
+    renderWeekdays();
+    bindEvents();
+    setInterval(tickCountdown, 1000);   // countdown bergerak tiap detik
+    // layout final (tinggi kalender) baru pasti setelah render pertama → hitung ulang paginasi
+    setTimeout(renderUpcoming, 80);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
