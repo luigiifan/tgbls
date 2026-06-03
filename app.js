@@ -12,6 +12,7 @@
   const KEY_THEME = 'tigabelas.theme';
   const KEY_SESSION = 'tigabelas.session';
   const KEY_TAGS = 'tigabelas.tags.v1';
+  const KEY_PHOTOS = 'tigabelas.photos.v1';
 
   // Home point — used to compute distance. Change here if needed.
   const HOME = { name: 'Sidoarjo', lat: -7.4478, lng: 112.7183 };
@@ -42,13 +43,13 @@
   let selectedDate = null;       // 'YYYY-MM-DD' untuk day modal
   let loggingIn = false;         // true while the 5s login loader runs
   let statsExpanded = false;     // state expand/collapse statistik
-  let countdownTarget = null;    // timestamp (ms) event terdekat untuk countdown live
   let upcomingPage = 0;          // halaman aktif daftar kegiatan mendatang
 
   // State form kegiatan
   let formTags = [];             // id tag terpilih
   let formLocation = null;       // { name, lat, lng } | null
-  let formTimeline = [];         // [{ time, title }]
+  let formTimeline = [];         // [{ time, title, location }]
+  let tlDragFrom = null;         // source index while reordering timeline
 
   // Leaflet
   let leafletMap = null, leafletMarker = null, mapTempLocation = null;
@@ -72,14 +73,11 @@
     openReceiptBtn: $('openReceiptBtn'),
     // receipt modal
     receiptModal: $('receiptModal'), receiptStage: $('receiptStage'), receiptArea: $('receiptArea'), receiptFront: $('receiptFront'), receiptBody: $('receiptBody'), downloadReceiptBtn: $('downloadReceiptBtn'),
-    // detail modal
-    detailModal: $('detailModal'), detailTitle: $('detailTitle'), detailDate: $('detailDate'),
-    detailBody: $('detailBody'), detailFooter: $('detailFooter'),
     // login modal
     loginModal: $('loginModal'), loginForm: $('loginForm'), loginError: $('loginError'),
     loginLoading: $('loginLoading'), loginRing: $('loginRing'), loginRingPct: $('loginRingPct'),
     // day modal
-    dayModal: $('dayModal'), dayModalWeekday: $('dayModalWeekday'),
+    dayModal: $('dayModal'), dayModalDone: $('dayModalDone'),
     dayModalTitle: $('dayModalTitle'), dayModalList: $('dayModalList'),
     dayModalFooter: $('dayModalFooter'),
     // event modal
@@ -154,9 +152,6 @@
   function eventUnitCount(ev) {
     const n = (ev.timeline || []).length;
     return n > 0 ? n : 1;
-  }
-  function dayUnitCount(key) {
-    return eventsForDate(key).reduce((s, ev) => s + eventUnitCount(ev), 0);
   }
   // Finished/past event: past date, or today with last timeline time already passed.
   function isPastEvent(ev) {
@@ -269,7 +264,7 @@
 
       const key = dateKey(new Date(viewYear, viewMonth, dayNum));
       const isToday = key === tKey;
-      const count = dayUnitCount(key);
+      const hasEvent = !!eventForDate(key);
 
       const numClass = isToday
         ? 'flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-xs font-bold text-white dark:bg-white dark:text-neutral-900'
@@ -279,16 +274,16 @@
         ? 'border-neutral-900 dark:border-white'
         : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700';
 
-      // indikator jumlah event — pill di bawah tengah
-      const badge = count
-        ? `<span class="rounded-full bg-neutral-100 px-3.5 py-0.5 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">${count}</span>`
-        : '<span class="h-[18px]"></span>';
+      // event indicator — a single dot when the date has an event (lifted up a bit)
+      const dot = hasEvent
+        ? '<span class="mb-1.5 h-1.5 w-1.5 rounded-full bg-neutral-900 dark:bg-white sm:mb-2"></span>'
+        : '<span class="mb-1.5 h-1.5 w-1.5 sm:mb-2"></span>';
 
       html += `
         <button type="button" data-day="${key}"
           class="group aspect-square flex flex-col items-center justify-between rounded-xl border ${ringClass} bg-white p-1.5 text-center transition hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/50 sm:p-2">
           <span class="${numClass}">${dayNum}</span>
-          ${badge}
+          ${dot}
         </button>`;
     }
 
@@ -303,7 +298,7 @@
     return `
       <button type="button" data-day="${ev.date}"
         class="flex w-full items-stretch gap-3 rounded-xl border border-neutral-200 p-3 text-left transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50 ${past ? 'opacity-50' : ''}">
-        <div class="flex w-11 flex-shrink-0 flex-col items-center justify-center rounded-lg bg-neutral-900 py-1 text-white dark:bg-white dark:text-neutral-900">
+        <div class="flex w-11 flex-shrink-0 flex-col items-center justify-center rounded-lg bg-neutral-100 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
           <span class="text-base font-bold leading-none">${d.getDate()}</span>
           <span class="mt-0.5 text-[10px] font-medium uppercase">${MONTHS[d.getMonth()].slice(0, 3)}</span>
         </div>
@@ -370,6 +365,11 @@
   }
 
   /* ---------- Statistik tahunan ---------- */
+  function photosForYear(year) {
+    let all = [];
+    try { all = JSON.parse(localStorage.getItem(KEY_PHOTOS)) || []; } catch { all = []; }
+    return all.filter((p) => p.eventDate && p.eventDate.startsWith(year + '-')).length;
+  }
   function getYearStats(year) {
     const yr = events.filter((e) => e.date.startsWith(year + '-'));
     const kSet = kulinerTagIds();
@@ -381,6 +381,7 @@
       kuliner: yr.filter((e) => (e.tags || []).some((id) => kSet.has(id))).length,
       places: new Set(withLoc.map((e) => locationKey(e.location))).size,
       distance: withLoc.reduce((s, e) => s + haversineKm(HOME, e.location), 0),
+      photos: photosForYear(year),
     };
   }
 
@@ -390,17 +391,17 @@
     const unit = (n, u) => `${n}<span class="ml-0.5 text-sm font-semibold text-neutral-400 dark:text-neutral-500">${u}</span>`;
 
     const STATS = [
-      { label: 'Total Days', value: st.days,
+      { label: 'Days', value: st.days,
         icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />' },
-      { label: 'Total Hours', value: unit(fmtNum(st.hours), 'hrs'),
+      { label: 'Hours', value: unit(fmtNum(st.hours), 'hrs'),
         icon: '<circle cx="12" cy="12" r="9" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3" />' },
-      { label: 'Total Photos', value: '—',  // function coming later (photo album)
+      { label: 'Photos', value: st.photos,
         icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />' },
-      { label: 'Total Places', value: st.places,
+      { label: 'Places', value: st.places,
         icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z" /><circle cx="12" cy="10" r="2.5" />' },
-      { label: 'Total Food', value: st.kuliner,
+      { label: 'Food', value: st.kuliner,
         icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3" />' },
-      { label: 'Total Distance', value: unit(fmtNum(st.distance), 'km'),
+      { label: 'Distance', value: unit(fmtNum(st.distance), 'km'),
         icon: '<circle cx="5" cy="18" r="3" /><circle cx="19" cy="6" r="3" /><path stroke-linecap="round" d="M19 9V15a2 2 0 0 1-2 2H8m0 0 3-3m-3 3 3 3" />' },
     ];
 
@@ -438,7 +439,7 @@
     const rows = [
       ['Total Days', st.days],
       ['Total Hours', fmtNum(st.hours) + ' hrs'],
-      ['Total Photos', '-'],
+      ['Total Photos', st.photos],
       ['Total Places', st.places],
       ['Total Food', st.kuliner],
       ['Total Distance', fmtNum(st.distance) + ' km'],
@@ -473,7 +474,7 @@
       `rotateX(${view3d.rx}deg) rotateY(${view3d.ry}deg) scale(${view3d.scale})`;
   }
   function resetReceiptView() {
-    view3d.rx = 0; view3d.ry = 0; view3d.scale = 0.85;
+    view3d.rx = 0; view3d.ry = 0; view3d.scale = 0.95;
     applyReceiptTransform();
   }
   function openReceipt() {
@@ -502,29 +503,28 @@
     }
   }
 
-  /* ---------- Countdown live ke event terdekat ---------- */
-  // Timestamp event terdekat di masa depan (tanggal + waktu mulai timeline, atau 00:00).
-  function getNextTarget() {
-    const now = Date.now();
-    let best = null;
-    for (const ev of events) {
-      const [h, m] = (eventStart(ev) || '00:00').split(':').map(Number);
-      const d = parseKey(ev.date); d.setHours(h, m, 0, 0);
-      const t = d.getTime();
-      if (t > now && (best === null || t < best)) best = t;
-    }
-    return best;
+  /* ---------- Countdown ---------- */
+  // The nearest event whose date is today or later.
+  function nearestEvent() {
+    const tKey = todayKey();
+    return events
+      .filter((e) => e.date >= tKey)
+      .sort((a, b) => (a.date === b.date ? sortEvents(a, b) : a.date.localeCompare(b.date)))[0] || null;
   }
   function tickCountdown() {
-    let remaining = countdownTarget ? countdownTarget - Date.now() : -1;
-    if (remaining <= 0) {                 // target lewat → cari event berikutnya
-      countdownTarget = getNextTarget();
-      remaining = countdownTarget ? countdownTarget - Date.now() : -1;
-    }
-    if (!countdownTarget || remaining <= 0) {
-      el.countdownText.textContent = 'No upcoming events';
+    const ev = nearestEvent();
+    if (!ev) { el.countdownText.textContent = 'No upcoming events'; return; }
+
+    // Event day (hari H): show how many timeline items are available.
+    if (ev.date === todayKey()) {
+      el.countdownText.textContent = `${eventUnitCount(ev)} Event is Available`;
       return;
     }
+
+    // Future date: live countdown to its start time.
+    const [h, m] = (eventStart(ev) || '00:00').split(':').map(Number);
+    const d = parseKey(ev.date); d.setHours(h, m, 0, 0);
+    const remaining = Math.max(0, d.getTime() - Date.now());
     const s = Math.floor(remaining / 1000);
     const days = Math.floor(s / 86400);
     const hrs = Math.floor((s % 86400) / 3600);
@@ -534,10 +534,7 @@
       ? `${days}:${pad(hrs)}:${pad(min)}:${pad(sec)}`
       : `${pad(hrs)}:${pad(min)}:${pad(sec)}`;
   }
-  function renderCountdown() {
-    countdownTarget = getNextTarget();
-    tickCountdown();
-  }
+  function renderCountdown() { tickCountdown(); }
 
   function renderAll() {
     renderCalendar();
@@ -547,7 +544,7 @@
   }
 
   /* ---------- Modal helpers ---------- */
-  const MODALS = () => [el.loginModal, el.dayModal, el.detailModal, el.eventModal, el.tagModal, el.mapModal, el.receiptModal];
+  const MODALS = () => [el.loginModal, el.dayModal, el.eventModal, el.tagModal, el.mapModal, el.receiptModal];
   function anyModalOpen() { return MODALS().some((m) => !m.classList.contains('hidden')); }
   function openModal(m) {
     m.classList.remove('hidden'); m.classList.add('flex');
@@ -562,7 +559,7 @@
     if (m === el.tagModal) { renderTagPicker(); renderAll(); }
   }
   function closeTopModal() {
-    for (const m of [el.receiptModal, el.mapModal, el.tagModal, el.eventModal, el.detailModal, el.dayModal, el.loginModal]) {
+    for (const m of [el.receiptModal, el.mapModal, el.tagModal, el.eventModal, el.dayModal, el.loginModal]) {
       if (!m.classList.contains('hidden')) { closeModalSmart(m); break; }
     }
   }
@@ -604,7 +601,7 @@
       closeModal(el.loginModal);
       toast(`Signed in as ${NAMES[user] || user}`);
       resetLoginView();
-      if (!el.dayModal.classList.contains('hidden')) { renderDayList(); renderDayFooter(); }
+      if (!el.dayModal.classList.contains('hidden')) renderDay();
     })(t0);
   }
   function resetLoginView() {
@@ -623,15 +620,22 @@
     setTimeout(focusFirstOtp, 50);
   }
 
-  /* ---------- Day modal ---------- */
+  /* ---------- Day modal (one event per date, detail-first) ---------- */
+  function eventForDate(key) {
+    return events.find((e) => e.date === key) || null;
+  }
   function openDay(key) {
     selectedDate = key;
     const d = parseKey(key);
-    el.dayModalWeekday.textContent = WEEKDAYS_LONG[d.getDay()];
-    el.dayModalTitle.textContent = `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-    renderDayList();
-    renderDayFooter();
+    el.dayModalTitle.textContent = `${WEEKDAYS_LONG[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    renderDay();
     openModal(el.dayModal);
+  }
+  function renderDay() {
+    const ev = eventForDate(selectedDate);
+    el.dayModalDone.classList.toggle('hidden', !(ev && isPastEvent(ev)));
+    renderDayBody(ev);
+    renderDayFooter(ev);
   }
 
   function tagNameById(id) {
@@ -639,81 +643,18 @@
     return t ? t.name : null;
   }
 
-  function renderDayList() {
-    const dayEvents = eventsForDate(selectedDate);
-    if (!dayEvents.length) {
+  function renderDayBody(ev) {
+    if (!ev) {
       el.dayModalList.innerHTML = `
         <div class="rounded-xl border border-dashed border-neutral-200 p-8 text-center dark:border-neutral-800">
-          <p class="text-sm text-neutral-500 dark:text-neutral-400">No events on this day.</p>
+          <p class="text-sm text-neutral-500 dark:text-neutral-400">No event on this day.</p>
         </div>`;
       return;
     }
-
-    const ICON_CLOCK = '<circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 8v4l3 2"/>';
-    const ICON_LIST = '<path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>';
-    const ICON_PIN = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z"/><circle cx="12" cy="10" r="2"/>';
-
-    el.dayModalList.innerHTML = dayEvents.map((ev) => {
-      const past = isPastEvent(ev);
-      const tagChips = (ev.tags || []).map((id) => {
-        const name = tagNameById(id);
-        return name ? `<span class="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">${escapeHtml(name)}</span>` : '';
-      }).join('');
-
-      const times = timelineTimes(ev);
-      const range = times.length >= 2 ? `${times[0]} – ${times[times.length - 1]}` : (times[0] || '');
-      const tlCount = (ev.timeline || []).length;
-      const metaPart = (icon, text) =>
-        `<span class="inline-flex min-w-0 items-center gap-1"><svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">${icon}</svg><span class="truncate">${text}</span></span>`;
-      const meta = [];
-      if (range) meta.push(metaPart(ICON_CLOCK, range));
-      if (tlCount) meta.push(metaPart(ICON_LIST, `${tlCount} Act`));
-      if (ev.location) meta.push(metaPart(ICON_PIN, escapeHtml(ev.location.name)));
-      const metaLine = meta.length
-        ? `<div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500 dark:text-neutral-400">${meta.join('')}</div>` : '';
-
-      // edit & delete only when logged in AND the event is not finished/past
-      const editDel = (currentUser && !past) ? `
-        <button type="button" data-edit="${ev.id}" title="Edit"
-          class="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-white">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4v16h16v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-        </button>
-        <button type="button" data-delete="${ev.id}" title="Delete"
-          class="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-white">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /></svg>
-        </button>` : '';
-
-      // "DONE" rubber stamp (centered) for finished/past events
-      const stamp = past ? `
-        <div class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <span class="-rotate-12 rounded-md border-2 border-neutral-400/70 px-3 py-1 text-base font-extrabold uppercase tracking-[0.2em] text-neutral-400/70 dark:border-neutral-500/70 dark:text-neutral-500/70">Done</span>
-        </div>` : '';
-
-      return `
-        <div class="relative rounded-xl border border-neutral-200 p-3 transition hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700 ${past ? 'opacity-70' : ''}">
-          ${stamp}
-          <div class="flex items-start justify-between gap-2">
-            <button type="button" data-detail="${ev.id}" class="min-w-0 flex-1 text-left">
-              <div class="mb-1 flex flex-wrap items-center gap-1.5">
-                ${tagChips}
-                <span class="flex h-5 w-5 items-center justify-center rounded-full border border-neutral-300 text-[10px] font-bold text-neutral-500 dark:border-neutral-700 dark:text-neutral-400" title="Created by ${ev.owner}">${ev.owner}</span>
-              </div>
-              <p class="font-semibold leading-snug">${escapeHtml(ev.title)}</p>
-              ${metaLine}
-            </button>
-            <div class="flex flex-shrink-0 items-center gap-1">
-              <button type="button" data-detail="${ev.id}" title="View detail"
-                class="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-white">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
-              ${editDel}
-            </div>
-          </div>
-        </div>`;
-    }).join('');
+    el.dayModalList.innerHTML = eventDetailHTML(ev);
   }
 
-  // Konten detail lengkap satu kegiatan.
+  // Full detail of one event (shown directly inside the day modal).
   function eventDetailHTML(ev) {
     const tagChips = (ev.tags || []).map((id) => {
       const n = tagNameById(id);
@@ -758,10 +699,11 @@
 
     return `
       <div class="space-y-4">
-        <div class="flex flex-wrap items-center gap-1.5">
-          ${tagChips}
-          <span class="ml-auto flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-neutral-300 text-[10px] font-bold text-neutral-500 dark:border-neutral-700 dark:text-neutral-400" title="Created by ${ev.owner}">${ev.owner}</span>
+        <div class="flex items-start justify-between gap-2">
+          <h4 class="text-lg font-bold leading-snug">${escapeHtml(ev.title)}</h4>
+          <span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-neutral-300 text-[10px] font-bold text-neutral-500 dark:border-neutral-700 dark:text-neutral-400" title="Created by ${ev.owner}">${ev.owner}</span>
         </div>
+        <div class="flex flex-wrap items-center gap-1.5">${tagChips}</div>
         <div class="space-y-2 rounded-xl border border-neutral-200 p-3.5 dark:border-neutral-800">
           ${infoRow('Time', range)}
           ${infoRow('Duration', durTxt)}
@@ -778,45 +720,44 @@
       </div>`;
   }
 
-  function openDetail(id) {
-    const ev = events.find((e) => e.id === id);
-    if (!ev) return;
-    const d = parseKey(ev.date);
-    el.detailDate.textContent = `${WEEKDAYS_LONG[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-    el.detailTitle.textContent = ev.title;
-    el.detailBody.innerHTML = eventDetailHTML(ev);
-    // edit only when logged in AND event not finished/past
-    const editBtn = (currentUser && !isPastEvent(ev))
-      ? `<button type="button" data-edit="${ev.id}"
-          class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4v16h16v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          Edit
-        </button>` : '';
-    el.detailFooter.innerHTML = `
-      <button type="button" data-close-modal
-        class="flex-1 rounded-xl border border-neutral-200 py-2.5 text-sm font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
-        Close
-      </button>
-      ${editBtn}`;
-    openModal(el.detailModal);
-  }
+  function renderDayFooter(ev) {
+    // fill button gets a transparent border so it matches the outline button's box exactly
+    const editBtn = `<button type="button" data-edit="${ev ? ev.id : ''}"
+        class="flex flex-1 items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4v16h16v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit
+      </button>`;
+    const delBtn = (cls) => `<button type="button" data-delete="${ev ? ev.id : ''}"
+        class="${cls} items-center justify-center gap-2 rounded-xl border border-neutral-200 py-2.5 text-sm font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+        Delete
+      </button>`;
 
-  function renderDayFooter() {
-    if (currentUser) {
-      el.dayModalFooter.innerHTML = `
-        <button type="button" id="addEventBtn"
-          class="flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14" /></svg>
-          Add Event
-        </button>`;
+    let html;
+    if (!ev) {
+      // empty date → add (logged in) or login hint
+      html = currentUser
+        ? `<button type="button" id="addEventBtn"
+            class="flex w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14" /></svg>
+            Add Event
+          </button>`
+        : loginHintBtn();
+    } else if (!currentUser) {
+      html = loginHintBtn();
+    } else if (isPastEvent(ev)) {
+      html = delBtn('flex w-full');               // finished event → delete only
     } else {
-      el.dayModalFooter.innerHTML = `
-        <button type="button" id="footerLoginBtn"
-          class="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 py-2.5 text-sm font-semibold text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2" /><path stroke-linecap="round" d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-          Sign in to add / edit
-        </button>`;
+      html = delBtn('flex flex-1') + editBtn;      // delete (left) + edit (right)
     }
+    el.dayModalFooter.innerHTML = html;
+  }
+  function loginHintBtn() {
+    return `<button type="button" id="footerLoginBtn"
+        class="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 py-2.5 text-sm font-semibold text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2" /><path stroke-linecap="round" d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+        Sign in to add / edit
+      </button>`;
   }
 
   /* ---------- Event form: pickers ---------- */
@@ -868,6 +809,10 @@
     el.timelineEditor.innerHTML = formTimeline.map((it, i) => `
       <div class="tl-row rounded-lg border border-neutral-200 p-2 dark:border-neutral-700" data-index="${i}">
         <div class="flex items-center gap-2">
+          <button type="button" data-tl-drag draggable="true" title="Drag to reorder"
+            class="flex h-8 w-5 flex-shrink-0 cursor-grab items-center justify-center text-neutral-400 transition hover:text-neutral-700 active:cursor-grabbing dark:hover:text-neutral-200">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>
+          </button>
           <input type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" value="${escapeHtml(it.time || '')}" data-tl-field="time"
             class="w-[4.5rem] flex-shrink-0 rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-center text-sm tabular-nums outline-none transition focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white" />
           <input type="text" value="${escapeHtml(it.title || '')}" data-tl-field="title" placeholder="Activity" maxlength="80"
@@ -939,6 +884,10 @@
     const date = el.eventDate.value;
     if (!title || !date) return;
 
+    const id = el.eventId.value;
+    // one event per date
+    if (events.some((x) => x.date === date && x.id !== id)) { toast('This date already has an event'); return; }
+
     const desc = el.eventDesc.value.trim();
     const timeline = formTimeline
       .map((i) => ({ time: maskTime(i.time || ''), title: (i.title || '').trim(), location: i.location || null }))
@@ -953,7 +902,6 @@
       location: formLocation,
       timeline,
     };
-    const id = el.eventId.value;
 
     if (id) {
       const ev = events.find((x) => x.id === id);
@@ -982,7 +930,7 @@
     events = events.filter((x) => x.id !== id);
     saveEvents();
     renderAll();
-    renderDayList();
+    if (!el.dayModal.classList.contains('hidden')) renderDay();
     toast('Event deleted');
   }
 
@@ -998,9 +946,11 @@
         <input type="text" value="${escapeHtml(t.name)}" data-tag-name maxlength="24"
           class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white" />
         <button type="button" data-tag-kuliner title="Count as food"
-          class="flex-shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${t.kuliner
+          class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border transition ${t.kuliner
             ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
-            : 'border-neutral-300 text-neutral-500 dark:border-neutral-700 dark:text-neutral-400'}">Food</button>
+            : 'border-neutral-300 text-neutral-400 dark:border-neutral-700 dark:text-neutral-500'}">
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3" /></svg>
+        </button>
         <button type="button" data-tag-del title="Remove tag"
           class="flex-shrink-0 rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
@@ -1183,6 +1133,37 @@
     el.openReceiptBtn.addEventListener('click', openReceipt);
     el.downloadReceiptBtn.addEventListener('click', downloadReceipt);
 
+    // timeline reorder (drag the grip handle)
+    el.timelineEditor.addEventListener('dragstart', (e) => {
+      const h = e.target.closest('[data-tl-drag]');
+      if (!h) return;
+      const row = h.closest('.tl-row');
+      tlDragFrom = Number(row.dataset.index);
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', String(tlDragFrom)); } catch {}
+      row.classList.add('opacity-40');
+    });
+    el.timelineEditor.addEventListener('dragover', (e) => { if (tlDragFrom !== null) e.preventDefault(); });
+    el.timelineEditor.addEventListener('drop', (e) => {
+      if (tlDragFrom === null) return;
+      e.preventDefault();
+      const row = e.target.closest('.tl-row');
+      const item = formTimeline.splice(tlDragFrom, 1)[0];
+      let insertAt;
+      if (!row) {
+        insertAt = formTimeline.length;
+      } else {
+        const t = Number(row.dataset.index);
+        insertAt = tlDragFrom < t ? t - 1 : t;
+      }
+      formTimeline.splice(insertAt, 0, item);
+      tlDragFrom = null;
+      renderTimelineEditor();
+    });
+    el.timelineEditor.addEventListener('dragend', () => {
+      if (tlDragFrom !== null) { tlDragFrom = null; renderTimelineEditor(); }
+    });
+
     // interaksi 3D struk: seret untuk putar, scroll untuk zoom, klik dua kali reset
     el.receiptStage.addEventListener('pointerdown', (e) => {
       view3d.dragging = true; view3d.lx = e.clientX; view3d.ly = e.clientY;
@@ -1233,15 +1214,8 @@
       const dayBtn = e.target.closest('[data-day]');
       if (dayBtn) { openDay(dayBtn.dataset.day); return; }
 
-      const detBtn = e.target.closest('[data-detail]');
-      if (detBtn) { openDetail(detBtn.dataset.detail); return; }
-
       const editBtn = e.target.closest('[data-edit]');
-      if (editBtn) {
-        if (!el.detailModal.classList.contains('hidden')) closeModal(el.detailModal);
-        openEventForm(editBtn.dataset.edit);
-        return;
-      }
+      if (editBtn) { openEventForm(editBtn.dataset.edit); return; }
 
       const delBtn = e.target.closest('[data-delete]');
       if (delBtn) { deleteEvent(delBtn.dataset.delete); return; }
