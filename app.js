@@ -181,12 +181,17 @@
     return `${loc.lat.toFixed(3)},${loc.lng.toFixed(3)}`;
   }
 
-  /* ---------- Storage ---------- */
+  /* ---------- Storage (localStorage cache + remote sync) ---------- */
+  const API_URL = '/api/state';
+  let remoteOn = false;     // is the shared DB reachable?
+  let dirty = false;        // local changes not yet pushed
+  let pushTimer = null;
+
   function loadEvents() {
     try { events = JSON.parse(localStorage.getItem(KEY_EVENTS)) || []; }
     catch { events = []; }
   }
-  function saveEvents() { localStorage.setItem(KEY_EVENTS, JSON.stringify(events)); }
+  function saveEvents() { localStorage.setItem(KEY_EVENTS, JSON.stringify(events)); schedulePush(); }
 
   function loadTags() {
     try {
@@ -194,7 +199,55 @@
       tags = raw ? JSON.parse(raw) : DEFAULT_TAGS.slice();
     } catch { tags = DEFAULT_TAGS.slice(); }
   }
-  function saveTags() { localStorage.setItem(KEY_TAGS, JSON.stringify(tags)); }
+  function saveTags() { localStorage.setItem(KEY_TAGS, JSON.stringify(tags)); schedulePush(); }
+
+  function schedulePush() {
+    dirty = true;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushRemote, 600);
+  }
+  // Push the shared state to the DB (only signed-in users may write).
+  async function pushRemote() {
+    if (!currentUser) return;
+    try {
+      const r = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-tgbls-code': USERS[currentUser] },
+        body: JSON.stringify({ events, tags }),
+      });
+      if (r.ok) { remoteOn = true; dirty = false; }
+    } catch { remoteOn = false; }
+  }
+  // Pull the shared state from the DB and adopt it (falls back to cache offline).
+  async function pullRemote() {
+    try {
+      const r = await fetch(API_URL, { cache: 'no-store' });
+      if (!r.ok) { remoteOn = false; return; }
+      const data = await r.json();
+      remoteOn = true;
+      const remoteEvents = Array.isArray(data.events) ? data.events : [];
+      const remoteTags = Array.isArray(data.tags) ? data.tags : [];
+      // first run migration: DB empty but we have local data → upload it
+      if (remoteEvents.length === 0 && events.length > 0) {
+        if (currentUser) pushRemote();
+      } else {
+        events = remoteEvents;
+        localStorage.setItem(KEY_EVENTS, JSON.stringify(events));
+      }
+      if (remoteTags.length) {
+        tags = remoteTags;
+        localStorage.setItem(KEY_TAGS, JSON.stringify(tags));
+      }
+      renderAll();
+      if (!el.dayModal.classList.contains('hidden')) renderDay();
+    } catch { remoteOn = false; }
+  }
+  // Refresh from the DB, but not while editing or with unsaved local changes.
+  function maybePull() {
+    if (dirty) return;
+    if (!el.eventModal.classList.contains('hidden')) return;
+    pullRemote();
+  }
 
   /* ---------- Tema ---------- */
   function applyTheme(theme) {
@@ -1304,6 +1357,11 @@
     });
     // setelah semua aset (Tailwind/font) selesai → ukuran final, hitung ulang
     window.addEventListener('load', () => renderUpcoming());
+
+    // sinkron data bersama: segarkan saat tab difokuskan & berkala
+    window.addEventListener('focus', maybePull);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) maybePull(); });
+    setInterval(maybePull, 30000);
   }
 
   /* ---------- Init ---------- */
@@ -1318,6 +1376,7 @@
     setInterval(tickCountdown, 1000);   // countdown bergerak tiap detik
     // layout final (tinggi kalender) baru pasti setelah render pertama → hitung ulang paginasi
     setTimeout(renderUpcoming, 80);
+    pullRemote();                        // ambil data terbaru dari DB (fallback ke cache bila offline)
   }
 
   document.addEventListener('DOMContentLoaded', init);

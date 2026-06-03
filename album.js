@@ -62,6 +62,17 @@
     catch { toast('Storage full — could not save'); return false; }
   }
   function loadEvents() { try { return JSON.parse(localStorage.getItem(KEY_EVENTS)) || []; } catch { return []; } }
+  // Refresh the shared events/tags from the DB into the local cache (so the
+  // event chooser shows what was created on other devices). Falls back silently.
+  async function syncFromDB() {
+    try {
+      const r = await fetch('/api/state', { cache: 'no-store' });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (Array.isArray(data.events)) localStorage.setItem(KEY_EVENTS, JSON.stringify(data.events));
+      if (Array.isArray(data.tags) && data.tags.length) localStorage.setItem(KEY_TAGS, JSON.stringify(data.tags));
+    } catch { /* offline → keep cache */ }
+  }
   function loadTagMap() {
     let tags = [];
     try { tags = JSON.parse(localStorage.getItem(KEY_TAGS)) || []; } catch { tags = []; }
@@ -97,6 +108,7 @@
     const files = Array.from(fileList).filter((f) => f.type.startsWith('image/'));
     if (!files.length) return;
     pendingPhotos = [];
+    await syncFromDB();   // make sure the event list is current before assigning
     for (const file of files) {
       try { pendingPhotos.push(await fileToDataURL(file)); }
       catch { toast(`Could not read ${file.name}`); }
@@ -315,6 +327,7 @@
     initTheme();
     loadPhotos();
     renderGallery();
+    syncFromDB();   // refresh shared events/tags from the DB (for the assign popup)
 
     $('themeToggle').addEventListener('click', () => {
       const isDark = document.documentElement.classList.contains('dark');
