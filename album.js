@@ -6,7 +6,6 @@
 (function () {
   'use strict';
 
-  const KEY_THEME = 'tigabelas.theme';
   const KEY_PHOTOS = 'tigabelas.photos.v1';   // local cache of photo metadata
   const KEY_EVENTS = 'tigabelas.events.v1';
   const KEY_TAGS = 'tigabelas.tags.v1';
@@ -24,18 +23,13 @@
   let chosenEvent = null;   // event picked in step 1
   let chosenTimeline = [];  // its (filtered) timeline items for step 2
 
-  /* ---------- Theme ---------- */
-  function applyTheme(theme) {
-    const dark = theme === 'dark';
-    document.documentElement.classList.toggle('dark', dark);
-    $('iconSun').classList.toggle('hidden', !dark);
-    $('iconMoon').classList.toggle('hidden', dark);
-    localStorage.setItem(KEY_THEME, theme);
-  }
-  function initTheme() {
-    let theme = localStorage.getItem(KEY_THEME);
-    if (!theme) theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    applyTheme(theme);
+  /* ---------- Theme (user-based, no toggle) ---------- */
+  function applyUserTheme() {
+    const session = localStorage.getItem(KEY_SESSION);
+    const isFany = session === 'F';
+    document.documentElement.classList.toggle('dark', !isFany);
+    document.documentElement.classList.toggle('user-fany', isFany);
+    document.documentElement.dataset.user = isFany ? 'F' : (session || '');
   }
 
   /* ---------- Util ---------- */
@@ -364,18 +358,13 @@
 
   /* ---------- Init ---------- */
   function init() {
-    initTheme();
+    applyUserTheme();
     loadPhotosCache();   // instant display from cache
     renderGallery();
     fetchPhotos();       // then refresh from the DB
     syncFromDB();        // refresh shared events/tags (for the assign popup)
 
-    $('themeToggle').addEventListener('click', () => {
-      const isDark = document.documentElement.classList.contains('dark');
-      applyTheme(isDark ? 'light' : 'dark');
-    });
-
-    // Upload button → open file picker directly (must be signed in to upload)
+    // Upload button → open file picker (must be signed in)
     const fileInput = $('fileInput');
     $('uploadBtn').addEventListener('click', () => {
       if (!currentCode()) { toast('Sign in on the calendar first to upload'); return; }

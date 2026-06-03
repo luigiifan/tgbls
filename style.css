@@ -111,59 +111,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     linear-gradient(#000 0 0) center / 100% calc(100% - 2 * var(--s)) no-repeat;
 }
 
-/* ── Fany: full pink-and-white theme ────────────────────────
-   html.user-fany is added and dark class is removed by
-   renderAuth() when Fany logs in. Luigi keeps black/white.
-   Pink palette:
-     pink-50  #fdf2f8  page bg
-     pink-100 #fce7f3  badge / hover
-     pink-200 #fbcfe8  card borders
-     pink-300 #f9a8d4  input borders / dashes
-     pink-400 #f472b6  very muted text
-     pink-500 #ec4899  accent (buttons, rings, indicators)
-     pink-600 #db2777  muted text
-     pink-700 #be185d  secondary text / hover accent
+/* ── Fany: standard LIGHT theme + pink accent ───────────────
+   html.user-fany is added and the dark class is removed by
+   renderAuth() when Fany logs in, so the app renders in its
+   normal light theme (the light mirror of Luigi's dark one).
+   We ONLY swap the black/white accent → pink. Surfaces,
+   borders, text and shadows all stay at their defaults.
+   pink-500 #ec4899 accent · pink-600 #db2777 hover
    ──────────────────────────────────────────────────────────── */
 
-/* Page */
-.user-fany body { background-color: #fdf2f8; }
+/* Text selection */
+.user-fany ::selection { background: #fbcfe8; color: #831843; }
 
-/* Header backdrop */
-.user-fany header {
-  background-color: rgba(253, 242, 248, 0.85) !important;
-  border-bottom-color: #fbcfe8 !important;
-}
-
-/* Subtle / muted backgrounds */
-.user-fany .bg-neutral-50  { background-color: #fdf2f8 !important; }
-.user-fany .bg-neutral-100 { background-color: #fce7f3 !important; }
-
-/* Hover fills */
-.user-fany .hover\:bg-neutral-50:hover       { background-color: #fdf2f8 !important; }
-.user-fany .hover\:bg-neutral-100:hover      { background-color: #fce7f3 !important; }
-.user-fany .hover\:bg-neutral-800\/50:hover  { background-color: #fdf2f8 !important; }
-
-/* Borders */
-.user-fany .border-neutral-200 { border-color: #fbcfe8 !important; }
-.user-fany .border-neutral-300 { border-color: #f9a8d4 !important; }
-.user-fany .border-dashed      { border-color: #f9a8d4 !important; }
-.user-fany .hover\:border-neutral-300:hover { border-color: #f9a8d4 !important; }
-.user-fany .hover\:border-neutral-400:hover { border-color: #f472b6 !important; }
-
-/* Muted text */
-.user-fany .text-neutral-400 { color: #f472b6 !important; }
-.user-fany .text-neutral-500 { color: #db2777 !important; }
-.user-fany .text-neutral-600 { color: #be185d !important; }
-
-/* Modal backdrops: soft pink tint */
-.user-fany .modal-backdrop { background-color: rgba(190, 24, 93, 0.18) !important; }
-
-/* Scrollbar */
-.user-fany *                          { scrollbar-color: #f9a8d4 transparent; }
-.user-fany *::-webkit-scrollbar-thumb { background-color: #f9a8d4 !important; }
-
-/* ── Fill buttons ─────────────────────────────────────────── */
+/* Fill buttons (black in the light theme) → pink */
 .user-fany #loginBtn,
+.user-fany #uploadBtn,
 .user-fany #loginForm button[type=submit],
 .user-fany #eventForm button[type=submit],
 .user-fany #addTagBtn,
@@ -175,6 +137,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-color: transparent !important;
 }
 .user-fany #loginBtn:hover,
+.user-fany #uploadBtn:hover,
 .user-fany #loginForm button[type=submit]:hover,
 .user-fany #eventForm button[type=submit]:hover,
 .user-fany #addTagBtn:hover,
@@ -182,25 +145,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .user-fany #addEventBtn:hover,
 .user-fany [data-edit]:hover { background-color: #db2777 !important; }
 
-/* Ghost / outline button hover text */
-.user-fany .hover\:text-neutral-900:hover { color: #831843 !important; }
-
-/* ── User avatar ─────────────────────────────────────────── */
+/* User avatar */
 .user-fany #userAvatar { background-color: #ec4899 !important; color: #fff !important; }
 
-/* ── Login progress ring ─────────────────────────────────── */
+/* Login progress ring */
 .user-fany #loginRing { color: #ec4899 !important; }
 
-/* ── Input / textarea focus ──────────────────────────────── */
+/* Input / textarea focus → pink (mirrors the neutral focus ring) */
 .user-fany input:focus,
 .user-fany textarea:focus {
   border-color: #ec4899 !important;
-  box-shadow: 0 0 0 2px rgb(236 72 153 / 0.15) !important;
+  box-shadow: 0 0 0 2px rgb(236 72 153 / 0.12) !important;
 }
 
-/* ── Dynamic elements (data attributes set in app.js) ─────── */
-
-/* Accent-fill: selected tags, food btn, today circle, toast */
+/* Dynamic accent-fill: selected tags, food btn, today circle, toast */
 .user-fany [data-af] {
   background-color: #ec4899 !important;
   color: #fff !important;

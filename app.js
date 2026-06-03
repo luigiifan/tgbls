@@ -9,7 +9,6 @@
   const USERS = { L: '1305', F: '1304' };
   const NAMES = { L: 'Luigi', F: 'Fany' };   // display names
   const KEY_EVENTS = 'tigabelas.events.v1';
-  const KEY_THEME = 'tigabelas.theme';
   const KEY_SESSION = 'tigabelas.session';
   const KEY_TAGS = 'tigabelas.tags.v1';
   const KEY_PHOTOS = 'tigabelas.photos.v1';
@@ -61,7 +60,7 @@
   /* ---------- Element refs ---------- */
   const $ = (id) => document.getElementById(id);
   const el = {
-    themeToggle: $('themeToggle'), iconSun: $('iconSun'), iconMoon: $('iconMoon'),
+    albumLink: $('albumLink'),
     loginBtn: $('loginBtn'), userBox: $('userBox'), userLabel: $('userLabel'),
     userAvatar: $('userAvatar'), logoutBtn: $('logoutBtn'),
     monthTitle: $('monthTitle'), todayBtn: $('todayBtn'), countdownText: $('countdownText'),
@@ -249,20 +248,6 @@
     pullRemote();
   }
 
-  /* ---------- Tema ---------- */
-  function applyTheme(theme) {
-    const dark = theme === 'dark';
-    document.documentElement.classList.toggle('dark', dark);
-    el.iconSun.classList.toggle('hidden', !dark);
-    el.iconMoon.classList.toggle('hidden', dark);
-    localStorage.setItem(KEY_THEME, theme);
-  }
-  function initTheme() {
-    let theme = localStorage.getItem(KEY_THEME);
-    if (!theme) theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    applyTheme(theme);
-  }
-
   /* ---------- Sesi / Auth ---------- */
   function initSession() {
     const u = localStorage.getItem(KEY_SESSION);
@@ -274,22 +259,11 @@
     const isFany = currentUser === 'F';
     document.documentElement.dataset.user = currentUser || '';
     document.documentElement.classList.toggle('user-fany', isFany);
+    // Luigi + logged-out → dark theme. Fany → light + pink theme.
+    document.documentElement.classList.toggle('dark', !isFany);
 
-    if (isFany) {
-      // Fany has a fixed pink theme — force light base and hide the toggle
-      document.documentElement.classList.remove('dark');
-      el.themeToggle.classList.add('hidden');
-    } else {
-      // Restore the saved theme preference for Luigi / logged-out
-      const saved = localStorage.getItem(KEY_THEME);
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const isDark = saved ? saved === 'dark' : prefersDark;
-      document.documentElement.classList.toggle('dark', isDark);
-      el.iconSun.classList.toggle('hidden', !isDark);
-      el.iconMoon.classList.toggle('hidden', isDark);
-      el.themeToggle.classList.remove('hidden');
-    }
-
+    el.albumLink.classList.toggle('hidden', !loggedIn);
+    el.albumLink.classList.toggle('flex', loggedIn);
     el.loginBtn.classList.toggle('hidden', loggedIn);
     el.userBox.classList.toggle('hidden', !loggedIn);
     el.userBox.classList.toggle('flex', loggedIn);
@@ -1184,11 +1158,6 @@
 
   /* ---------- Event listeners ---------- */
   function bindEvents() {
-    el.themeToggle.addEventListener('click', () => {
-      const isDark = document.documentElement.classList.contains('dark');
-      applyTheme(isDark ? 'light' : 'dark');
-    });
-
     el.loginBtn.addEventListener('click', openLogin);
     el.logoutBtn.addEventListener('click', logout);
 
@@ -1387,7 +1356,6 @@
 
   /* ---------- Init ---------- */
   function init() {
-    initTheme();
     loadEvents();
     loadTags();
     initSession();
