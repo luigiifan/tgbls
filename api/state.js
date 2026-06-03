@@ -1,35 +1,59 @@
 /* ============================================================
    Tigabelas — shared state API (Vercel serverless function)
-   Stores { events, tags } as one JSON document in Vercel KV
-   (Upstash Redis) via its REST API. No npm deps needed.
+   Stores { events, tags } as one JSON row in Supabase (Postgres)
+   via its REST API (PostgREST). No npm deps needed.
 
    Required env vars (set in Vercel project settings):
-     KV_REST_API_URL   (or UPSTASH_REDIS_REST_URL)
-     KV_REST_API_TOKEN (or UPSTASH_REDIS_REST_TOKEN)
+     SUPABASE_URL                 e.g. https://xxxx.supabase.co
+     SUPABASE_SERVICE_ROLE_KEY    (service_role key — server-side only!)
    Optional:
-     TGBLS_CODES = "1305,1304"   (codes allowed to write)
+     TGBLS_CODES = "1305,1304"    (codes allowed to write)
+
+   One-time SQL to run in Supabase (SQL editor):
+     create table if not exists app_state (
+       id text primary key,
+       data jsonb not null default '{}'::jsonb,
+       updated_at timestamptz not null default now()
+     );
+     alter table app_state enable row level security;
+   (service_role bypasses RLS, so no policies are needed.)
    ============================================================ */
 
-const KEY = 'tigabelas:state';
+const TABLE = 'app_state';
+const ROW_ID = 'tigabelas';
 
-function kvEnv() {
+function sbEnv() {
   return {
-    url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+    url: process.env.SUPABASE_URL,
+    key: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY,
   };
 }
 
-// Run a Redis command via the Upstash REST API (e.g. ["GET", key]).
-async function kv(cmd) {
-  const { url, token } = kvEnv();
-  if (!url || !token) throw new Error('KV not configured');
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(cmd),
+async function sbGet() {
+  const { url, key } = sbEnv();
+  if (!url || !key) throw new Error('Supabase not configured');
+  const r = await fetch(`${url}/rest/v1/${TABLE}?id=eq.${ROW_ID}&select=data`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
-  if (!r.ok) throw new Error('KV request failed: ' + r.status);
-  return r.json(); // { result: ... }
+  if (!r.ok) throw new Error('Supabase GET failed: ' + r.status);
+  const rows = await r.json();
+  return rows[0] ? rows[0].data : null;
+}
+
+async function sbUpsert(data) {
+  const { url, key } = sbEnv();
+  if (!url || !key) throw new Error('Supabase not configured');
+  const r = await fetch(`${url}/rest/v1/${TABLE}`, {
+    method: 'POST',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify([{ id: ROW_ID, data, updated_at: new Date().toISOString() }]),
+  });
+  if (!r.ok) throw new Error('Supabase upsert failed: ' + r.status + ' ' + (await r.text()));
 }
 
 function readBody(req) {
@@ -52,8 +76,7 @@ module.exports = async (req, res) => {
 
   try {
     if (req.method === 'GET') {
-      const out = await kv(['GET', KEY]);
-      const data = out.result ? JSON.parse(out.result) : { events: [], tags: [], updatedAt: 0 };
+      const data = (await sbGet()) || { events: [], tags: [], updatedAt: 0 };
       return res.status(200).json(data);
     }
 
@@ -67,7 +90,7 @@ module.exports = async (req, res) => {
         tags: Array.isArray(body.tags) ? body.tags : [],
         updatedAt: Date.now(),
       };
-      await kv(['SET', KEY, JSON.stringify(data)]);
+      await sbUpsert(data);
       return res.status(200).json({ ok: true, updatedAt: data.updatedAt });
     }
 
