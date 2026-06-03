@@ -7,9 +7,12 @@
   'use strict';
 
   const KEY_THEME = 'tigabelas.theme';
-  const KEY_PHOTOS = 'tigabelas.photos.v1';
+  const KEY_PHOTOS = 'tigabelas.photos.v1';   // local cache of photo metadata
   const KEY_EVENTS = 'tigabelas.events.v1';
   const KEY_TAGS = 'tigabelas.tags.v1';
+  const KEY_SESSION = 'tigabelas.session';
+  const USERS = { L: '1305', F: '1304' };
+  const API_PHOTOS = '/api/photos';
   const MAX_DIM = 1600;
   const QUALITY = 0.82;
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -55,11 +58,21 @@
   }
   function parseKey(key) { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d); }
 
-  /* ---------- Storage ---------- */
-  function loadPhotos() { try { photos = JSON.parse(localStorage.getItem(KEY_PHOTOS)) || []; } catch { photos = []; } }
-  function savePhotos() {
-    try { localStorage.setItem(KEY_PHOTOS, JSON.stringify(photos)); return true; }
-    catch { toast('Storage full — could not save'); return false; }
+  /* ---------- Storage (Supabase via /api/photos, localStorage = cache) ---------- */
+  // code of the signed-in user (login happens on the calendar page; session is shared)
+  function currentCode() { return USERS[localStorage.getItem(KEY_SESSION)] || null; }
+
+  function loadPhotosCache() { try { photos = JSON.parse(localStorage.getItem(KEY_PHOTOS)) || []; } catch { photos = []; } }
+  function cachePhotos() { try { localStorage.setItem(KEY_PHOTOS, JSON.stringify(photos)); } catch { /* ignore */ } }
+
+  // Pull the photo list from the DB (falls back to cache when offline).
+  async function fetchPhotos() {
+    try {
+      const r = await fetch(API_PHOTOS, { cache: 'no-store' });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (Array.isArray(data)) { photos = data; cachePhotos(); renderGallery(); }
+    } catch { /* offline → keep cache */ }
   }
   function loadEvents() { try { return JSON.parse(localStorage.getItem(KEY_EVENTS)) || []; } catch { return []; } }
   // Refresh the shared events/tags from the DB into the local cache (so the
@@ -206,7 +219,10 @@
     assignBatch(chosenEvent, item);
   }
 
-  function assignBatch(ev, tlItem) {
+  async function assignBatch(ev, tlItem) {
+    const code = currentCode();
+    if (!code) { toast('Sign in on the calendar first to upload'); return; }
+
     const tagMap = loadTagMap();
     const meta = {
       eventId: ev.id,
@@ -218,17 +234,29 @@
       timelineTime: tlItem ? (tlItem.time || '') : '',
     };
 
-    let added = 0;
-    for (const src of pendingPhotos) {
-      photos.unshift({ id: uid(), src, ...meta });
-      if (!savePhotos()) { photos.shift(); break; }
-      added++;
-    }
+    const batch = pendingPhotos.slice();
     pendingPhotos = [];
     chosenEvent = null;
     chosenTimeline = [];
     closeModal($('eventChooserModal'));
-    renderGallery();
+    toast(`Uploading ${batch.length} photo${batch.length > 1 ? 's' : ''}…`);
+
+    let added = 0;
+    for (const dataUrl of batch) {
+      try {
+        const r = await fetch(API_PHOTOS, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-tgbls-code': code },
+          body: JSON.stringify({ dataUrl, meta }),
+        });
+        if (!r.ok) throw new Error(String(r.status));
+        const row = await r.json();
+        photos.unshift(row);
+        cachePhotos();
+        renderGallery();
+        added++;
+      } catch { toast('Upload failed for a photo'); }
+    }
     if (added) toast(`${added} photo${added > 1 ? 's' : ''} added`);
   }
 
@@ -274,29 +302,41 @@
     }
     $('emptyHint').classList.add('hidden');
 
+    const canEdit = !!currentCode();
     $('gallery').innerHTML = list.map((p) => {
       const cap = photoCaption(p);
-      return `
-        <figure class="group relative aspect-square overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-800">
-          <img src="${p.src}" alt="${escapeHtml(p.eventTitle || 'Photo')}" loading="lazy" data-photo="${p.id}"
-            class="h-full w-full cursor-zoom-in object-cover transition duration-300 group-hover:scale-105" />
-          <figcaption class="pointer-events-none absolute inset-x-0 bottom-0 translate-y-2 bg-gradient-to-t from-black/70 to-transparent p-2.5 text-xs font-medium text-white opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">${cap}</figcaption>
+      const delBtn = canEdit ? `
           <button type="button" data-del="${p.id}" title="Delete photo"
             class="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg bg-black/50 text-white opacity-0 backdrop-blur transition hover:bg-black/70 group-hover:opacity-100">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /></svg>
-          </button>
+          </button>` : '';
+      return `
+        <figure class="group relative aspect-square overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-800">
+          <img src="${p.url}" alt="${escapeHtml(p.eventTitle || 'Photo')}" loading="lazy" data-photo="${p.id}"
+            class="h-full w-full cursor-zoom-in object-cover transition duration-300 group-hover:scale-105" />
+          <figcaption class="pointer-events-none absolute inset-x-0 bottom-0 translate-y-2 bg-gradient-to-t from-black/70 to-transparent p-2.5 text-xs font-medium text-white opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">${cap}</figcaption>
+          ${delBtn}
         </figure>`;
     }).join('');
   }
 
-  function deletePhoto(id) {
+  async function deletePhoto(id) {
     const p = photos.find((x) => x.id === id);
     if (!p) return;
+    const code = currentCode();
+    if (!code) { toast('Sign in on the calendar first to delete'); return; }
     if (!window.confirm('Delete this photo?')) return;
-    photos = photos.filter((x) => x.id !== id);
-    savePhotos();
-    renderGallery();
-    toast('Photo deleted');
+    try {
+      const r = await fetch(`${API_PHOTOS}?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { 'x-tgbls-code': code },
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      photos = photos.filter((x) => x.id !== id);
+      cachePhotos();
+      renderGallery();
+      toast('Photo deleted');
+    } catch { toast('Delete failed'); }
   }
 
   /* ---------- Modal helpers ---------- */
@@ -312,7 +352,7 @@
   function openLightbox(id) {
     const p = photos.find((x) => x.id === id);
     if (!p) return;
-    $('lightboxImg').src = p.src;
+    $('lightboxImg').src = p.url;
     $('lightboxImg').alt = p.eventTitle || 'Photo';
     const parts = [];
     if (p.eventTitle) parts.push(p.eventTitle);
@@ -325,18 +365,22 @@
   /* ---------- Init ---------- */
   function init() {
     initTheme();
-    loadPhotos();
+    loadPhotosCache();   // instant display from cache
     renderGallery();
-    syncFromDB();   // refresh shared events/tags from the DB (for the assign popup)
+    fetchPhotos();       // then refresh from the DB
+    syncFromDB();        // refresh shared events/tags (for the assign popup)
 
     $('themeToggle').addEventListener('click', () => {
       const isDark = document.documentElement.classList.contains('dark');
       applyTheme(isDark ? 'light' : 'dark');
     });
 
-    // Upload button → open file picker directly
+    // Upload button → open file picker directly (must be signed in to upload)
     const fileInput = $('fileInput');
-    $('uploadBtn').addEventListener('click', () => fileInput.click());
+    $('uploadBtn').addEventListener('click', () => {
+      if (!currentCode()) { toast('Sign in on the calendar first to upload'); return; }
+      fileInput.click();
+    });
     fileInput.addEventListener('change', () => { handleFiles(fileInput.files); fileInput.value = ''; });
 
     // back to the event list (step 1)
