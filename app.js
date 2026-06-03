@@ -271,6 +271,25 @@
   }
   function renderAuth() {
     const loggedIn = !!currentUser;
+    const isFany = currentUser === 'F';
+    document.documentElement.dataset.user = currentUser || '';
+    document.documentElement.classList.toggle('user-fany', isFany);
+
+    if (isFany) {
+      // Fany has a fixed pink theme — force light base and hide the toggle
+      document.documentElement.classList.remove('dark');
+      el.themeToggle.classList.add('hidden');
+    } else {
+      // Restore the saved theme preference for Luigi / logged-out
+      const saved = localStorage.getItem(KEY_THEME);
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = saved ? saved === 'dark' : prefersDark;
+      document.documentElement.classList.toggle('dark', isDark);
+      el.iconSun.classList.toggle('hidden', !isDark);
+      el.iconMoon.classList.toggle('hidden', isDark);
+      el.themeToggle.classList.remove('hidden');
+    }
+
     el.loginBtn.classList.toggle('hidden', loggedIn);
     el.userBox.classList.toggle('hidden', !loggedIn);
     el.userBox.classList.toggle('flex', loggedIn);
@@ -329,13 +348,13 @@
 
       // event indicator — a single dot when the date has an event (lifted up a bit)
       const dot = hasEvent
-        ? '<span class="mb-1.5 h-1.5 w-1.5 rounded-full bg-neutral-900 dark:bg-white sm:mb-2"></span>'
+        ? '<span data-ad class="mb-1.5 h-1.5 w-1.5 rounded-full bg-neutral-900 dark:bg-white sm:mb-2"></span>'
         : '<span class="mb-1.5 h-1.5 w-1.5 sm:mb-2"></span>';
 
       html += `
-        <button type="button" data-day="${key}"
+        <button type="button" data-day="${key}" ${isToday ? 'data-today' : ''}
           class="group aspect-square flex flex-col items-center justify-between rounded-xl border ${ringClass} bg-white p-1.5 text-center transition hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/50 sm:p-2">
-          <span class="${numClass}">${dayNum}</span>
+          <span ${isToday ? 'data-af' : ''} class="${numClass}">${dayNum}</span>
           ${dot}
         </button>`;
     }
@@ -506,12 +525,12 @@
 
     el.receiptBody.innerHTML = `
       <div class="text-center">
-        <p class="text-xl font-bold tracking-[0.25em]">TIGABELAS</p>
-        <p class="text-[11px] tracking-wide">www.tgbls.com</p>
+        <p class="text-xl font-bold tracking-[0.25em]">E-RECEIPT</p>
+        <p class="text-[11px] tracking-wide">Made by <span class="font-sans font-bold tracking-tight">tigabelas.</span></p>
       </div>
       <div class="my-3 border-t border-dashed border-neutral-400"></div>
       <p class="text-center text-[11px] leading-relaxed">
-        STATISTICS RECEIPT<br/>YEAR ${year}<br/>Date: ${printed}
+         ${year} YEAR STATISTICS<br/>Date: ${printed}
       </p>
       <div class="my-3 border-t border-double border-neutral-500"></div>
       <div class="space-y-1.5 text-[13px]">${rows.map((r) => line(r[0], r[1])).join('')}</div>
@@ -753,7 +772,7 @@
     return `
       <div class="space-y-4">
         <div class="flex items-start justify-between gap-2">
-          <h4 class="text-lg font-bold leading-snug">${escapeHtml(ev.title)}</h4>
+          <h4 class="min-w-0 flex-1 break-words text-lg font-bold leading-snug">${escapeHtml(ev.title)}</h4>
           <span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-neutral-300 text-[10px] font-bold text-neutral-500 dark:border-neutral-700 dark:text-neutral-400" title="Created by ${ev.owner}">${ev.owner}</span>
         </div>
         <div class="flex flex-wrap items-center gap-1.5">${tagChips}</div>
@@ -776,7 +795,7 @@
   function renderDayFooter(ev) {
     // fill button gets a transparent border so it matches the outline button's box exactly
     const editBtn = `<button type="button" data-edit="${ev ? ev.id : ''}"
-        class="flex flex-1 items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+        class="tgbls-fill flex flex-1 items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4v16h16v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         Edit
       </button>`;
@@ -791,19 +810,20 @@
       // empty date → add (logged in) or login hint
       html = currentUser
         ? `<button type="button" id="addEventBtn"
-            class="flex w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+            class="tgbls-fill flex w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14" /></svg>
             Add Event
           </button>`
-        : loginHintBtn();
+        : '';
     } else if (!currentUser) {
-      html = loginHintBtn();
+      html = '';
     } else if (isPastEvent(ev)) {
       html = delBtn('flex w-full');               // finished event → delete only
     } else {
       html = delBtn('flex flex-1') + editBtn;      // delete (left) + edit (right)
     }
     el.dayModalFooter.innerHTML = html;
+    el.dayModalFooter.classList.toggle('hidden', !html);
   }
   function loginHintBtn() {
     return `<button type="button" id="footerLoginBtn"
@@ -821,7 +841,7 @@
     }
     el.tagPicker.innerHTML = tags.map((t) => {
       const on = formTags.includes(t.id);
-      return `<button type="button" data-tag-toggle="${t.id}"
+      return `<button type="button" data-tag-toggle="${t.id}" ${on ? 'data-af' : ''}
         class="rounded-full border px-3 py-1 text-xs font-semibold transition ${on
           ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
           : 'border-neutral-300 text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300'}">
@@ -998,7 +1018,7 @@
       <div class="flex items-center gap-2" data-tag-index="${i}">
         <input type="text" value="${escapeHtml(t.name)}" data-tag-name maxlength="24"
           class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white" />
-        <button type="button" data-tag-kuliner title="Count as food"
+        <button type="button" data-tag-kuliner title="Count as food" ${t.kuliner ? 'data-af' : ''}
           class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border transition ${t.kuliner
             ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
             : 'border-neutral-300 text-neutral-400 dark:border-neutral-700 dark:text-neutral-500'}">
@@ -1135,6 +1155,7 @@
   function toast(message) {
     const t = document.createElement('div');
     t.className = 'toast pointer-events-auto rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-neutral-900';
+    t.dataset.af = '';
     t.textContent = message;
     el.toastContainer.appendChild(t);
     setTimeout(() => {
@@ -1282,7 +1303,7 @@
 
       // day modal footer
       if (e.target.closest('#addEventBtn')) { openEventForm(null); return; }
-      if (e.target.closest('#footerLoginBtn')) { openLogin(); return; }
+      if (e.target.closest('#footerLoginBtn')) { closeModal(el.dayModal); openLogin(); return; }
 
       // tag picker (form)
       const tg = e.target.closest('[data-tag-toggle]');
