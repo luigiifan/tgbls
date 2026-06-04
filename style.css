@@ -125,7 +125,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* Fill buttons (black in the light theme) → pink */
 .user-fany #loginBtn,
-.user-fany #uploadBtn,
 .user-fany #loginForm button[type=submit],
 .user-fany #eventForm button[type=submit],
 .user-fany #addTagBtn,
@@ -137,7 +136,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-color: transparent !important;
 }
 .user-fany #loginBtn:hover,
-.user-fany #uploadBtn:hover,
 .user-fany #loginForm button[type=submit]:hover,
 .user-fany #eventForm button[type=submit]:hover,
 .user-fany #addTagBtn:hover,

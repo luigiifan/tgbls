@@ -11,7 +11,6 @@
   const KEY_EVENTS = 'tigabelas.events.v1';
   const KEY_SESSION = 'tigabelas.session';
   const KEY_TAGS = 'tigabelas.tags.v1';
-  const KEY_PHOTOS = 'tigabelas.photos.v1';
 
   // Home point — used to compute distance. Change here if needed.
   const HOME = { name: 'Sidoarjo', lat: -7.4478, lng: 112.7183 };
@@ -26,13 +25,14 @@
   const WEEKDAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+  // Built-in tags — fixed (cannot be renamed or removed). Everything else is custom.
   const DEFAULT_TAGS = [
-    { id: 'tg-film', name: 'Movie', kuliner: false },
-    { id: 'tg-kuliner', name: 'Food', kuliner: true },
-    { id: 'tg-jalan', name: 'Outing', kuliner: false },
-    { id: 'tg-belanja', name: 'Shopping', kuliner: false },
-    { id: 'tg-olahraga', name: 'Sport', kuliner: false },
+    { id: 'tg-film', name: 'Movie', kuliner: false, movie: true },
+    { id: 'tg-kuliner', name: 'Food', kuliner: true, movie: false },
+    { id: 'tg-olahraga', name: 'Sport', kuliner: false, movie: false },
   ];
+  const DEFAULT_TAG_IDS = new Set(DEFAULT_TAGS.map((t) => t.id));
+  const LEGACY_TAG_IDS = ['tg-jalan', 'tg-belanja']; // old seeded defaults — removed on load
 
   /* ---------- State ---------- */
   let viewYear, viewMonth;       // bulan yang sedang ditampilkan (month 0-indexed)
@@ -60,7 +60,6 @@
   /* ---------- Element refs ---------- */
   const $ = (id) => document.getElementById(id);
   const el = {
-    albumLink: $('albumLink'),
     loginBtn: $('loginBtn'), userBox: $('userBox'), userLabel: $('userLabel'),
     userAvatar: $('userAvatar'), logoutBtn: $('logoutBtn'),
     monthTitle: $('monthTitle'), todayBtn: $('todayBtn'), countdownText: $('countdownText'),
@@ -176,6 +175,9 @@
   function kulinerTagIds() {
     return new Set(tags.filter((t) => t.kuliner).map((t) => t.id));
   }
+  function movieTagIds() {
+    return new Set(tags.filter((t) => t.movie).map((t) => t.id));
+  }
   function locationKey(loc) {
     return `${loc.lat.toFixed(3)},${loc.lng.toFixed(3)}`;
   }
@@ -192,11 +194,28 @@
   }
   function saveEvents() { localStorage.setItem(KEY_EVENTS, JSON.stringify(events)); schedulePush(); }
 
+  // Keep only the 3 built-in defaults + custom tags. Drops legacy seeded tags
+  // (Outing/Shopping) and guarantees the built-ins exist with their fixed
+  // name + flags. Runs on every load and on every remote pull.
+  function normalizeTags() {
+    tags = (tags || []).filter((t) => t && t.id && !LEGACY_TAG_IDS.includes(t.id));
+    DEFAULT_TAGS.forEach((def, idx) => {
+      const ex = tags.find((t) => t.id === def.id);
+      if (ex) { ex.name = def.name; ex.kuliner = def.kuliner; ex.movie = def.movie; }
+      else tags.splice(idx, 0, { ...def });
+    });
+    tags.forEach((t) => {
+      if (typeof t.movie !== 'boolean') t.movie = false;
+      if (typeof t.kuliner !== 'boolean') t.kuliner = false;
+    });
+  }
   function loadTags() {
     try {
       const raw = localStorage.getItem(KEY_TAGS);
       tags = raw ? JSON.parse(raw) : DEFAULT_TAGS.slice();
     } catch { tags = DEFAULT_TAGS.slice(); }
+    normalizeTags();
+    localStorage.setItem(KEY_TAGS, JSON.stringify(tags));
   }
   function saveTags() { localStorage.setItem(KEY_TAGS, JSON.stringify(tags)); schedulePush(); }
 
@@ -235,6 +254,7 @@
       }
       if (remoteTags.length) {
         tags = remoteTags;
+        normalizeTags();
         localStorage.setItem(KEY_TAGS, JSON.stringify(tags));
       }
       renderAll();
@@ -262,8 +282,6 @@
     // Luigi + logged-out → dark theme. Fany → light + pink theme.
     document.documentElement.classList.toggle('dark', !isFany);
 
-    el.albumLink.classList.toggle('hidden', !loggedIn);
-    el.albumLink.classList.toggle('flex', loggedIn);
     el.loginBtn.classList.toggle('hidden', loggedIn);
     el.userBox.classList.toggle('hidden', !loggedIn);
     el.userBox.classList.toggle('flex', loggedIn);
@@ -411,23 +429,19 @@
   }
 
   /* ---------- Statistik tahunan ---------- */
-  function photosForYear(year) {
-    let all = [];
-    try { all = JSON.parse(localStorage.getItem(KEY_PHOTOS)) || []; } catch { all = []; }
-    return all.filter((p) => p.eventDate && p.eventDate.startsWith(year + '-')).length;
-  }
   function getYearStats(year) {
     const yr = events.filter((e) => e.date.startsWith(year + '-'));
     const kSet = kulinerTagIds();
+    const mSet = movieTagIds();
     const withLoc = yr.filter((e) => e.location);
     return {
       count: yr.length,
       days: new Set(yr.map((e) => e.date)).size,
       hours: yr.reduce((s, e) => s + eventDurationHours(e), 0),
       kuliner: yr.filter((e) => (e.tags || []).some((id) => kSet.has(id))).length,
+      movies: yr.filter((e) => (e.tags || []).some((id) => mSet.has(id))).length,
       places: new Set(withLoc.map((e) => locationKey(e.location))).size,
       distance: withLoc.reduce((s, e) => s + haversineKm(HOME, e.location), 0),
-      photos: photosForYear(year),
     };
   }
 
@@ -441,8 +455,8 @@
         icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />' },
       { label: 'Hours', value: unit(fmtNum(st.hours), 'hrs'),
         icon: '<circle cx="12" cy="12" r="9" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3" />' },
-      { label: 'Photos', value: st.photos,
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />' },
+      { label: 'Movies', value: st.movies,
+        icon: '<rect x="2.5" y="4.5" width="19" height="15" rx="2" /><path stroke-linecap="round" d="M7 4.5v15M17 4.5v15M2.5 9.5H7M2.5 14.5H7M17 9.5h4.5M17 14.5h4.5" />' },
       { label: 'Places', value: st.places,
         icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z" /><circle cx="12" cy="10" r="2.5" />' },
       { label: 'Food', value: st.kuliner,
@@ -485,7 +499,7 @@
     const rows = [
       ['Total Days', st.days],
       ['Total Hours', fmtNum(st.hours) + ' hrs'],
-      ['Total Photos', st.photos],
+      ['Total Movies', st.movies],
       ['Total Places', st.places],
       ['Total Food', st.kuliner],
       ['Total Distance', fmtNum(st.distance) + ' km'],
@@ -563,7 +577,7 @@
 
     // Event day (hari H): show how many timeline items are available.
     if (ev.date === todayKey()) {
-      el.countdownText.textContent = `${eventUnitCount(ev)} Event is Available`;
+      el.countdownText.textContent = `${eventUnitCount(ev)} Events is Available`;
       return;
     }
 
@@ -988,26 +1002,23 @@
     openModal(el.tagModal);
   }
   function renderTagManager() {
-    el.tagManagerList.innerHTML = tags.length ? tags.map((t, i) => `
-      <div class="flex items-center gap-2" data-tag-index="${i}">
-        <input type="text" value="${escapeHtml(t.name)}" data-tag-name maxlength="24"
-          class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white" />
-        <button type="button" data-tag-kuliner title="Count as food" ${t.kuliner ? 'data-af' : ''}
-          class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border transition ${t.kuliner
-            ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
-            : 'border-neutral-300 text-neutral-400 dark:border-neutral-700 dark:text-neutral-500'}">
-          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3" /></svg>
-        </button>
-        <button type="button" data-tag-del title="Remove tag"
-          class="flex-shrink-0 rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-        </button>
-      </div>`).join('') : `<p class="text-sm text-neutral-400">No tags yet.</p>`;
+    // Only custom tags are managed here; the built-in Movie/Food/Sport are fixed.
+    const custom = tags.filter((t) => !DEFAULT_TAG_IDS.has(t.id));
+    el.tagManagerList.innerHTML = custom.length
+      ? custom.map((t) => `
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 py-1 pl-3 pr-1.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200">
+          ${escapeHtml(t.name)}
+          <button type="button" data-tag-del="${t.id}" title="Remove tag"
+            class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-neutral-400 transition hover:bg-neutral-200 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-white">
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </span>`).join('')
+      : `<p class="w-full text-sm text-neutral-400"></p>`;
   }
   function addTag() {
     const name = el.newTagName.value.trim();
     if (!name) return;
-    tags.push({ id: uid(), name, kuliner: false });
+    tags.push({ id: uid(), name, kuliner: false, movie: false });
     saveTags();
     el.newTagName.value = '';
     renderTagManager();
@@ -1296,17 +1307,14 @@
       if (e.target.closest('#pickLocationBtn') || e.target.closest('#changeLocationBtn')) { openMapModal({ type: 'event' }); return; }
       if (e.target.closest('#clearLocationBtn')) { formLocation = null; renderLocationBox(); return; }
 
-      // tag manager
+      // tag manager — remove a custom tag (built-ins aren't listed here)
       const tDel = e.target.closest('[data-tag-del]');
       if (tDel) {
-        const i = Number(tDel.closest('[data-tag-index]').dataset.tagIndex);
-        tags.splice(i, 1); saveTags(); renderTagManager();
-        return;
-      }
-      const tKul = e.target.closest('[data-tag-kuliner]');
-      if (tKul) {
-        const i = Number(tKul.closest('[data-tag-index]').dataset.tagIndex);
-        tags[i].kuliner = !tags[i].kuliner; saveTags(); renderTagManager();
+        const id = tDel.dataset.tagDel;
+        if (!DEFAULT_TAG_IDS.has(id)) {
+          tags = tags.filter((t) => t.id !== id);
+          saveTags(); renderTagManager();
+        }
         return;
       }
 
@@ -1316,15 +1324,8 @@
       if (e.target.classList.contains('modal-backdrop')) { closeModalSmart(e.target.parentElement); return; }
     });
 
-    // edit nama tag / field timeline (tanpa re-render agar fokus tidak hilang)
+    // edit field timeline (tanpa re-render agar fokus tidak hilang)
     document.addEventListener('input', (e) => {
-      const nameEl = e.target.closest('[data-tag-name]');
-      if (nameEl) {
-        const i = Number(nameEl.closest('[data-tag-index]').dataset.tagIndex);
-        tags[i].name = nameEl.value;
-        saveTags();
-        return;
-      }
       const tlField = e.target.closest('[data-tl-field]');
       if (tlField) {
         const row = tlField.closest('.tl-row');
