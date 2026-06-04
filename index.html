@@ -231,7 +231,7 @@
 
         <div>
           <label for="eventTitle" class="mb-1.5 block text-sm font-medium">Event Title <span class="text-neutral-400">*</span></label>
-          <input id="eventTitle" type="text" required maxlength="80" placeholder="e.g. Team meeting"
+          <input id="eventTitle" type="text" required maxlength="80"
             class="w-full rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white dark:focus:ring-white/10" />
         </div>
 
@@ -250,13 +250,7 @@
           <div id="tagPicker" class="flex flex-wrap gap-2"></div>
         </div>
 
-        <!-- Location -->
-        <div>
-          <label class="mb-1.5 block text-sm font-medium">Location</label>
-          <div id="locationBox"></div>
-        </div>
-
-        <!-- Timeline -->
+        <!-- Timeline (each item can have its own location) -->
         <div>
           <div class="mb-1.5 flex items-center justify-between">
             <label class="block text-sm font-medium">Timeline</label>
@@ -271,7 +265,7 @@
         <!-- Notes -->
         <div>
           <label for="eventDesc" class="mb-1.5 block text-sm font-medium">Notes</label>
-          <textarea id="eventDesc" rows="3" maxlength="300" placeholder="Event details (optional)"
+          <textarea id="eventDesc" rows="3" maxlength="300"
             class="w-full resize-none rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white dark:focus:ring-white/10"></textarea>
         </div>
 
@@ -364,10 +358,10 @@
       <!-- 3D stage: drag to rotate, scroll to zoom -->
       <div id="receiptStage" class="flex w-full flex-1 cursor-grab touch-none select-none items-center justify-center overflow-hidden" style="perspective: 1100px; min-height: 360px;">
         <div id="receiptArea" class="relative w-[260px]" style="transform-style: preserve-3d; will-change: transform;">
-          <div id="receiptFront" class="receipt-paper receipt-face px-6 py-7 font-mono text-neutral-900 shadow-2xl">
+          <div id="receiptFront" class="receipt-paper receipt-face bg-white px-6 py-7 font-mono text-neutral-900 shadow-2xl">
             <div id="receiptBody"></div>
           </div>
-          <div class="receipt-paper receipt-face receipt-back absolute inset-0 shadow-2xl"></div>
+          <div class="receipt-paper receipt-face receipt-back absolute inset-0 bg-white shadow-2xl"></div>
         </div>
       </div>
       <p class="mt-1 flex items-center justify-center gap-1.5 text-center text-[11px] text-white/70">

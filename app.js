@@ -46,13 +46,12 @@
 
   // State form kegiatan
   let formTags = [];             // id tag terpilih
-  let formLocation = null;       // { name, lat, lng } | null
   let formTimeline = [];         // [{ time, title, location }]
   let tlDragFrom = null;         // source index while reordering timeline
 
   // Leaflet
   let leafletMap = null, leafletMarker = null, mapTempLocation = null;
-  let mapTarget = { type: 'event' };   // sasaran lokasi: { type:'event' } | { type:'timeline', index }
+  let mapTarget = { type: 'timeline', index: 0 };   // location target: timeline item being edited
 
   // Receipt 3D view (default: menghadap lurus depan, zoom sedikit kecil)
   const view3d = { rx: 0, ry: 0, scale: 0.85, dragging: false, lx: 0, ly: 0 };
@@ -82,7 +81,7 @@
     eventModal: $('eventModal'), eventForm: $('eventForm'),
     eventModalTitle: $('eventModalTitle'), eventId: $('eventId'),
     eventTitle: $('eventTitle'), eventDate: $('eventDate'), eventDesc: $('eventDesc'),
-    tagPicker: $('tagPicker'), locationBox: $('locationBox'), timelineEditor: $('timelineEditor'),
+    tagPicker: $('tagPicker'), timelineEditor: $('timelineEditor'),
     manageTagsBtn: $('manageTagsBtn'), addTimelineBtn: $('addTimelineBtn'),
     // tag modal
     tagModal: $('tagModal'), tagManagerList: $('tagManagerList'),
@@ -429,19 +428,26 @@
   }
 
   /* ---------- Statistik tahunan ---------- */
+  // Locations now live on the timeline items (the event-level location was removed).
+  // Kept event.location as a fallback so older records still count.
+  function eventLocations(ev) {
+    const locs = (ev.timeline || []).map((i) => i.location).filter(Boolean);
+    if (!locs.length && ev.location) locs.push(ev.location);
+    return locs;
+  }
   function getYearStats(year) {
     const yr = events.filter((e) => e.date.startsWith(year + '-'));
     const kSet = kulinerTagIds();
     const mSet = movieTagIds();
-    const withLoc = yr.filter((e) => e.location);
+    const allLocs = yr.flatMap(eventLocations);
     return {
       count: yr.length,
       days: new Set(yr.map((e) => e.date)).size,
       hours: yr.reduce((s, e) => s + eventDurationHours(e), 0),
       kuliner: yr.filter((e) => (e.tags || []).some((id) => kSet.has(id))).length,
       movies: yr.filter((e) => (e.tags || []).some((id) => mSet.has(id))).length,
-      places: new Set(withLoc.map((e) => locationKey(e.location))).size,
-      distance: withLoc.reduce((s, e) => s + haversineKm(HOME, e.location), 0),
+      places: new Set(allLocs.map(locationKey)).size,
+      distance: allLocs.reduce((s, loc) => s + haversineKm(HOME, loc), 0),
     };
   }
 
@@ -562,10 +568,33 @@
     el.receiptArea.style.transform = 'none';   // rata supaya hasil unduh bersih
     try {
       const canvas = await html2canvas(el.receiptFront, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
+      const filename = `struk-statistik-tigabelas-${viewYear}.png`;
+      const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+      if (!blob) throw new Error('no blob');
+
+      // Mobile: open the native share sheet so the user can save to Photos/Files
+      // (iOS/Android Safari ignore the <a download> attribute).
+      const file = new File([blob], filename, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'tigabelas' });
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;   // user dismissed the sheet
+          // otherwise fall through to the blob-download path
+        }
+      }
+
+      // Desktop / fallback: download via an object URL (anchor must be in the DOM)
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.download = `struk-statistik-tigabelas-${viewYear}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = url;
+      link.download = filename;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
       link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast('Receipt downloaded');
     } catch {
       toast('Failed to download receipt');
@@ -737,8 +766,6 @@
     const range = times.length >= 2 ? `${times[0]} – ${times[times.length - 1]}` : (times[0] || '—');
     const dur = eventDurationHours(ev);
     const durTxt = dur ? `${fmtNum(dur)} hrs` : '—';
-    const loc = ev.location
-      ? `${escapeHtml(ev.location.name)} · ~${haversineKm(HOME, ev.location).toFixed(1)} km from ${HOME.name}` : '—';
 
     const tl = (ev.timeline || []).filter((i) => i.title || i.time);
     const timeline = tl.length ? `
@@ -779,7 +806,6 @@
         <div class="space-y-2 rounded-xl border border-neutral-200 p-3.5 dark:border-neutral-800">
           ${infoRow('Time', range)}
           ${infoRow('Duration', durTxt)}
-          ${infoRow('Location', loc)}
         </div>
         <div>
           <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Timeline</p>
@@ -825,13 +851,6 @@
     el.dayModalFooter.innerHTML = html;
     el.dayModalFooter.classList.toggle('hidden', !html);
   }
-  function loginHintBtn() {
-    return `<button type="button" id="footerLoginBtn"
-        class="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 py-2.5 text-sm font-semibold text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800">
-        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2" /><path stroke-linecap="round" d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-        Sign in to add / edit
-      </button>`;
-  }
 
   /* ---------- Event form: pickers ---------- */
   function renderTagPicker() {
@@ -847,31 +866,6 @@
           : 'border-neutral-300 text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300'}">
         ${escapeHtml(t.name)}</button>`;
     }).join('');
-  }
-
-  function renderLocationBox() {
-    if (formLocation) {
-      const dist = haversineKm(HOME, formLocation).toFixed(1);
-      el.locationBox.innerHTML = `
-        <div class="flex items-center gap-2 rounded-xl border border-neutral-300 px-3 py-2.5 dark:border-neutral-700">
-          <svg class="h-4 w-4 flex-shrink-0 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z"/><circle cx="12" cy="10" r="2.5"/></svg>
-          <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-medium">${escapeHtml(formLocation.name)}</p>
-            <p class="text-xs text-neutral-400">~${dist} km from ${HOME.name}</p>
-          </div>
-          <button type="button" id="changeLocationBtn" class="flex-shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-neutral-500 transition hover:bg-neutral-100 dark:hover:bg-neutral-800">Change</button>
-          <button type="button" id="clearLocationBtn" title="Remove location" class="flex-shrink-0 rounded-lg p-1 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
-          </button>
-        </div>`;
-    } else {
-      el.locationBox.innerHTML = `
-        <button type="button" id="pickLocationBtn"
-          class="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 py-2.5 text-sm font-medium text-neutral-500 transition hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z"/><circle cx="12" cy="10" r="2.5"/></svg>
-          Pick location on map
-        </button>`;
-    }
   }
 
   function renderTimelineEditor() {
@@ -932,18 +926,15 @@
       el.eventDate.value = ev.date;
       el.eventDesc.value = ev.desc || '';
       formTags = (ev.tags || []).slice();
-      formLocation = ev.location ? { ...ev.location } : null;
       formTimeline = (ev.timeline || []).map((i) => ({ ...i }));
     } else {
       el.eventModalTitle.textContent = 'Add Event';
       el.eventId.value = '';
       el.eventDate.value = selectedDate || todayKey();
       formTags = [];
-      formLocation = null;
       formTimeline = [];
     }
     renderTagPicker();
-    renderLocationBox();
     renderTimelineEditor();
     openModal(el.eventModal);
     setTimeout(() => el.eventTitle.focus(), 50);
@@ -972,7 +963,6 @@
     const payload = {
       title, date, desc,
       tags: formTags.slice(),
-      location: formLocation,
       timeline,
     };
 
@@ -1110,10 +1100,8 @@
     }
   }
   function openMapModal(target) {
-    mapTarget = target || { type: 'event' };
-    const existing = mapTarget.type === 'timeline'
-      ? (formTimeline[mapTarget.index] && formTimeline[mapTarget.index].location)
-      : formLocation;
+    mapTarget = target;
+    const existing = formTimeline[mapTarget.index] && formTimeline[mapTarget.index].location;
     mapTempLocation = existing ? { ...existing } : null;
     el.mapSearch.value = '';
     openModal(el.mapModal);
@@ -1138,12 +1126,9 @@
       lat: mapTempLocation.lat,
       lng: mapTempLocation.lng,
     };
-    if (mapTarget.type === 'timeline' && formTimeline[mapTarget.index]) {
+    if (formTimeline[mapTarget.index]) {
       formTimeline[mapTarget.index].location = loc;
       renderTimelineEditor();
-    } else {
-      formLocation = loc;
-      renderLocationBox();
     }
     closeModal(el.mapModal);
   }
@@ -1295,7 +1280,6 @@
 
       // day modal footer
       if (e.target.closest('#addEventBtn')) { openEventForm(null); return; }
-      if (e.target.closest('#footerLoginBtn')) { closeModal(el.dayModal); openLogin(); return; }
 
       // tag picker (form)
       const tg = e.target.closest('[data-tag-toggle]');
@@ -1314,10 +1298,6 @@
       if (tlLocClear) { const i = Number(tlLocClear.dataset.tlLocClear); if (formTimeline[i]) { formTimeline[i].location = null; renderTimelineEditor(); } return; }
       const tlLoc = e.target.closest('[data-tl-loc]');
       if (tlLoc) { openMapModal({ type: 'timeline', index: Number(tlLoc.dataset.tlLoc) }); return; }
-
-      // lokasi event
-      if (e.target.closest('#pickLocationBtn') || e.target.closest('#changeLocationBtn')) { openMapModal({ type: 'event' }); return; }
-      if (e.target.closest('#clearLocationBtn')) { formLocation = null; renderLocationBox(); return; }
 
       // tag manager — remove a custom tag (built-ins aren't listed here)
       const tDel = e.target.closest('[data-tag-del]');
