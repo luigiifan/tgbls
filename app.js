@@ -494,7 +494,11 @@
     const st = getYearStats(String(year));
     const now = new Date();
     const printed = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-    const ref = `TGBLS-${year}-${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+
+    // QR payload: TGBLS-<date>-<sum of food + movies + places + days + events>
+    const sum = st.kuliner + st.movies + st.places + st.days + st.count;
+    const dateCode = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+    const code = `TGBLS-${dateCode}-${sum}`;
 
     const rows = [
       ['Total Days', st.days],
@@ -511,10 +515,19 @@
         <span class="whitespace-nowrap font-bold">${v}</span>
       </div>`;
 
+    let qrImg = '';
+    if (typeof qrcode === 'function') {
+      try {
+        const qr = qrcode(0, 'M');
+        qr.addData(code);
+        qr.make();
+        qrImg = `<img src="${qr.createDataURL(4, 2)}" alt="${code}" class="mx-auto mt-3 h-20 w-20" />`;
+      } catch { qrImg = ''; }
+    }
+
     el.receiptBody.innerHTML = `
       <div class="text-center">
-        <p class="text-xl font-bold tracking-[0.25em]">E-RECEIPT</p>
-        <p class="text-[11px] tracking-wide">Made by <span class="font-sans font-bold tracking-tight">tigabelas.</span></p>
+        <p class="font-sans text-2xl font-extrabold tracking-tight">(tigabelas)</p>
       </div>
       <div class="my-3 border-t border-dashed border-neutral-400"></div>
       <p class="text-center text-[11px] leading-relaxed">
@@ -526,8 +539,7 @@
       <div class="text-[13px]">${line('TOTAL EVENTS', st.count)}</div>
       <div class="my-3 border-t border-double border-neutral-500"></div>
       <p class="text-center text-[11px] tracking-[0.2em]">*** THANK YOU ***</p>
-      <div class="receipt-barcode mx-auto mt-3 w-3/4"></div>
-      <p class="mt-1.5 text-center text-[10px] tracking-[0.25em]">${ref}</p>`;
+      ${qrImg}`;
   }
   function applyReceiptTransform() {
     el.receiptArea.style.transform =

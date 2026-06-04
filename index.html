@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>tigabelas.</title>
+  <title>tigabelas</title>
   <meta name="description" content="Full-month activity calendar." />
 
   <!-- Plus Jakarta Sans -->
@@ -40,7 +40,7 @@
     <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
       <!-- Brand -->
       <div class="flex items-center">
-        <h1 class="text-base font-bold tracking-tight sm:text-lg">tigabelas.</h1>
+        <h1 class="text-base font-bold tracking-tight sm:text-lg">(tigabelas)</h1>
       </div>
 
       <!-- Actions -->
@@ -364,10 +364,10 @@
       <!-- 3D stage: drag to rotate, scroll to zoom -->
       <div id="receiptStage" class="flex w-full flex-1 cursor-grab touch-none select-none items-center justify-center overflow-hidden" style="perspective: 1100px; min-height: 360px;">
         <div id="receiptArea" class="relative w-[260px]" style="transform-style: preserve-3d; will-change: transform;">
-          <div id="receiptFront" class="receipt-paper receipt-face bg-white px-6 py-7 font-mono text-neutral-900 shadow-2xl">
+          <div id="receiptFront" class="receipt-paper receipt-face px-6 py-7 font-mono text-neutral-900 shadow-2xl">
             <div id="receiptBody"></div>
           </div>
-          <div class="receipt-paper receipt-face receipt-back absolute inset-0 bg-white shadow-2xl"></div>
+          <div class="receipt-paper receipt-face receipt-back absolute inset-0 shadow-2xl"></div>
         </div>
       </div>
       <p class="mt-1 flex items-center justify-center gap-1.5 text-center text-[11px] text-white/70">
@@ -394,6 +394,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <!-- QR code generator (for the receipt) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

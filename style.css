@@ -98,9 +98,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   transform: rotateY(180deg);
 }
 
-/* Torn paper edges (zigzag) top & bottom */
+/* Torn paper edges (zigzag) top & bottom + crumpled-paper texture */
 .receipt-paper {
   --s: 11px; /* ukuran gerigi */
+  /* Warm paper base + crumple creases (SVG fractal-noise lighting) + soft sheen.
+     The SVG layer fakes wrinkles; the two radial gradients add a top highlight
+     and a faint bottom shadow so it reads like a softly crumpled sheet. */
+  background-color: #fcfbf6;
+  background-image:
+    url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='5' seed='14' stitchTiles='stitch'/><feDiffuseLighting surfaceScale='1.7' diffuseConstant='1.05' lighting-color='%23ffffff'><feDistantLight azimuth='225' elevation='58'/></feDiffuseLighting><feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -0.55 -0.55 -0.55 0 0.6'/></filter><rect width='320' height='320' filter='url(%23p)'/></svg>"),
+    radial-gradient(130% 90% at 50% -12%, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0) 55%),
+    radial-gradient(120% 120% at 50% 112%, rgba(60, 50, 40, 0.06), rgba(60, 50, 40, 0) 48%);
+  background-size: 320px 320px, 100% 100%, 100% 100%;
+  background-repeat: repeat, no-repeat, no-repeat;
   -webkit-mask:
     conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--s) var(--s) repeat-x,
     conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--s) var(--s) repeat-x,
@@ -169,15 +179,3 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* Today cell border */
 .user-fany [data-today] { border-color: #ec4899 !important; }
-
-.receipt-barcode {
-  height: 40px;
-  background-image: repeating-linear-gradient(
-    90deg,
-    #000 0, #000 2px, #fff 2px, #fff 4px,
-    #000 4px, #000 5px, #fff 5px, #fff 9px,
-    #000 9px, #000 12px, #fff 12px, #fff 14px
-  );
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
