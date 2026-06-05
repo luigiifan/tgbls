@@ -40,28 +40,16 @@
     <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
       <!-- Brand -->
       <div class="flex items-center">
-        <h1 class="text-base font-bold tracking-tight sm:text-lg">(tigabelas)</h1>
+        <h1 class="text-base font-bold tracking-tight sm:text-lg">tgbls.com</h1>
       </div>
 
       <!-- Actions -->
       <div class="flex items-center gap-2">
-        <!-- Logged-out: login button (transparent border to match the outline buttons) -->
-        <button id="loginBtn" type="button"
-          class="tgbls-fill inline-flex h-10 items-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 px-4 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" /></svg>
-          Sign in
+        <!-- Theme toggle: Toggle between Dark Mode & White Pink -->
+        <button id="themeToggleBtn" type="button" title="Toggle theme"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-neutral-200 bg-transparent transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+          <span id="themeToggleIcon" class="flex items-center justify-center"></span>
         </button>
-
-        <!-- Logged-in: profile card with logout inside, one container -->
-        <div id="userBox" class="hidden h-10 items-center gap-2 rounded-xl border border-neutral-200 py-1 pl-2 pr-1 text-sm font-semibold dark:border-neutral-800">
-          <span id="userAvatar" class="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-900 text-xs text-white dark:bg-white dark:text-neutral-900">L</span>
-          <span id="userLabel">L</span>
-          <span class="h-5 w-px bg-neutral-200 dark:bg-neutral-700"></span>
-          <button id="logoutBtn" type="button" title="Sign out"
-            class="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
-          </button>
-        </div>
       </div>
     </div>
   </header>
@@ -110,9 +98,10 @@
         <div class="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:p-5">
           <div class="mb-3 flex items-center justify-between gap-2">
             <h3 class="text-base font-bold tracking-tight">This Year's Stats</h3>
-            <button id="openReceiptBtn" type="button" title="Share / stats receipt"
-              class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-neutral-200 text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800">
-              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path stroke-linecap="round" stroke-linejoin="round" d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
+            <button id="openReceiptBtn" type="button" title="Share stats"
+              class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-neutral-200 px-3 text-xs font-semibold text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800">
+              <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path stroke-linecap="round" stroke-linejoin="round" d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
+              <span>Share</span>
             </button>
           </div>
           <div class="relative">
@@ -138,58 +127,10 @@
   </main>
 
   <footer class="mx-auto max-w-6xl px-4 pb-10 pt-2 text-center text-xs text-neutral-400 dark:text-neutral-600 sm:px-6">
-    Made with Love <3
+    made with love.
   </footer>
 
-  <!-- ===== Login Modal ===== -->
-  <div id="loginModal" class="modal-root fixed inset-0 z-50 hidden items-center justify-center p-4">
-    <div class="modal-backdrop absolute inset-0 bg-neutral-900/40 backdrop-blur-sm dark:bg-black/60 animate-fade-in"></div>
-    <div class="relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl dark:border-neutral-800 dark:bg-neutral-900 animate-pop-in">
-      <div class="mb-5 text-center">
-        <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
-          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2" /><path stroke-linecap="round" d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-        </div>
-        <h3 class="text-lg font-bold">Sign In</h3>
-        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Enter your 4-digit code.</p>
-      </div>
 
-      <form id="loginForm" class="space-y-4">
-        <div>
-          <label class="mb-2 block text-center text-sm font-medium">Code</label>
-          <div class="flex justify-center gap-2.5">
-            <input class="otp-box h-14 w-12 rounded-xl border border-neutral-300 bg-white text-center text-2xl font-bold outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white dark:focus:ring-white/10" type="text" inputmode="numeric" maxlength="1" autocomplete="off" />
-            <input class="otp-box h-14 w-12 rounded-xl border border-neutral-300 bg-white text-center text-2xl font-bold outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white dark:focus:ring-white/10" type="text" inputmode="numeric" maxlength="1" autocomplete="off" />
-            <input class="otp-box h-14 w-12 rounded-xl border border-neutral-300 bg-white text-center text-2xl font-bold outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white dark:focus:ring-white/10" type="text" inputmode="numeric" maxlength="1" autocomplete="off" />
-            <input class="otp-box h-14 w-12 rounded-xl border border-neutral-300 bg-white text-center text-2xl font-bold outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white dark:focus:ring-white/10" type="text" inputmode="numeric" maxlength="1" autocomplete="off" />
-          </div>
-          <p id="loginError" class="mt-2 hidden text-center text-sm font-medium text-neutral-900 dark:text-white">Wrong code. Try again.</p>
-        </div>
-
-        <div class="flex gap-2 pt-1">
-          <button type="button" data-close-modal
-            class="flex-1 rounded-xl border border-neutral-200 py-2.5 text-sm font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
-            Cancel
-          </button>
-          <button type="submit"
-            class="flex-1 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
-            Sign in
-          </button>
-        </div>
-      </form>
-
-      <!-- Loading (5s) -->
-      <div id="loginLoading" class="hidden flex-col items-center justify-center gap-4 py-4">
-        <div class="relative h-20 w-20">
-          <svg class="h-20 w-20 -rotate-90" viewBox="0 0 48 48" fill="none">
-            <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="4" class="text-neutral-200 dark:text-neutral-800" />
-            <circle id="loginRing" cx="24" cy="24" r="20" stroke="currentColor" stroke-width="4" stroke-linecap="round" class="text-neutral-900 dark:text-white" style="stroke-dasharray: 125.66; stroke-dashoffset: 125.66;" />
-          </svg>
-          <span id="loginRingPct" class="absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums">0%</span>
-        </div>
-        <p class="text-sm font-medium text-neutral-500 dark:text-neutral-400">Signing in…</p>
-      </div>
-    </div>
-  </div>
 
   <!-- ===== Day Modal ===== -->
   <div id="dayModal" class="modal-root fixed inset-0 z-50 hidden items-center justify-center p-4">
@@ -351,45 +292,13 @@
     </div>
   </div>
 
-  <!-- ===== Receipt (Struk Statistik) Modal — render 3D ===== -->
-  <div id="receiptModal" class="modal-root fixed inset-0 z-[56] hidden items-center justify-center p-4">
-    <div class="modal-backdrop absolute inset-0 bg-neutral-900/60 backdrop-blur-sm dark:bg-black/75 animate-fade-in"></div>
-    <div class="relative z-10 flex max-h-[94vh] w-full max-w-md flex-col items-center animate-pop-in">
-      <!-- 3D stage: drag to rotate, scroll to zoom -->
-      <div id="receiptStage" class="flex w-full flex-1 cursor-grab touch-none select-none items-center justify-center overflow-hidden" style="perspective: 1100px; min-height: 360px;">
-        <div id="receiptArea" class="relative w-[260px]" style="transform-style: preserve-3d; will-change: transform;">
-          <div id="receiptFront" class="receipt-paper receipt-face bg-white px-6 py-7 font-mono text-neutral-900 shadow-2xl">
-            <div id="receiptBody"></div>
-          </div>
-          <div class="receipt-paper receipt-face receipt-back absolute inset-0 bg-white shadow-2xl"></div>
-        </div>
-      </div>
-      <p class="mt-1 flex items-center justify-center gap-1.5 text-center text-[11px] text-white/70">
-        <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="7" y="3" width="10" height="18" rx="5" /><path stroke-linecap="round" d="M12 7v3" /></svg>
-        You can rotate the receipt.
-      </p>
-      <div class="mt-3 flex w-full max-w-[300px] flex-shrink-0 gap-2">
-        <button type="button" data-close-modal
-          class="flex-1 rounded-xl border border-white/30 bg-white/10 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20">
-          Close
-        </button>
-        <button type="button" id="downloadReceiptBtn"
-          class="flex flex-1 items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-white py-2.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-200 disabled:opacity-50">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
-          Download
-        </button>
-      </div>
-    </div>
-  </div>
+
 
   <!-- Toast container -->
   <div id="toastContainer" class="pointer-events-none fixed bottom-5 left-1/2 z-[60] flex -translate-x-1/2 flex-col items-center gap-2"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <!-- QR code generator (for the receipt) -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

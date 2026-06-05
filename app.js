@@ -6,10 +6,8 @@
   'use strict';
 
   /* ---------- Konstanta ---------- */
-  const USERS = { L: '1305', F: '1304' };
-  const NAMES = { L: 'Luigi', F: 'Fany' };   // display names
   const KEY_EVENTS = 'tigabelas.events.v1';
-  const KEY_SESSION = 'tigabelas.session';
+  const KEY_THEME = 'tigabelas.theme';
   const KEY_TAGS = 'tigabelas.tags.v1';
 
   // Home point — used to compute distance. Change here if needed.
@@ -38,9 +36,8 @@
   let viewYear, viewMonth;       // bulan yang sedang ditampilkan (month 0-indexed)
   let events = [];               // daftar kegiatan
   let tags = [];                 // daftar tag tersedia
-  let currentUser = null;        // 'L' | 'F' | null
+  let currentTheme = 'dark';     // 'dark' | 'pink'
   let selectedDate = null;       // 'YYYY-MM-DD' untuk day modal
-  let loggingIn = false;         // true while the 5s login loader runs
   let statsExpanded = false;     // state expand/collapse statistik
   let upcomingPage = 0;          // halaman aktif daftar kegiatan mendatang
 
@@ -53,14 +50,11 @@
   let leafletMap = null, leafletMarker = null, mapTempLocation = null;
   let mapTarget = { type: 'timeline', index: 0 };   // location target: timeline item being edited
 
-  // Receipt 3D view (default: menghadap lurus depan, zoom sedikit kecil)
-  const view3d = { rx: 0, ry: 0, scale: 0.85, dragging: false, lx: 0, ly: 0 };
-
   /* ---------- Element refs ---------- */
   const $ = (id) => document.getElementById(id);
   const el = {
-    loginBtn: $('loginBtn'), userBox: $('userBox'), userLabel: $('userLabel'),
-    userAvatar: $('userAvatar'), logoutBtn: $('logoutBtn'),
+    themeToggleBtn: $('themeToggleBtn'),
+    themeToggleIcon: $('themeToggleIcon'),
     monthTitle: $('monthTitle'), todayBtn: $('todayBtn'), countdownText: $('countdownText'),
     prevBtn: $('prevBtn'), nextBtn: $('nextBtn'),
     weekdayRow: $('weekdayRow'), calendarGrid: $('calendarGrid'),
@@ -68,11 +62,6 @@
     statsGrid: $('statsGrid'), statsFade: $('statsFade'), statsToggleWrap: $('statsToggleWrap'),
     calendarCard: $('calendarCard'), sidebar: $('sidebar'),
     openReceiptBtn: $('openReceiptBtn'),
-    // receipt modal
-    receiptModal: $('receiptModal'), receiptStage: $('receiptStage'), receiptArea: $('receiptArea'), receiptFront: $('receiptFront'), receiptBody: $('receiptBody'), downloadReceiptBtn: $('downloadReceiptBtn'),
-    // login modal
-    loginModal: $('loginModal'), loginForm: $('loginForm'), loginError: $('loginError'),
-    loginLoading: $('loginLoading'), loginRing: $('loginRing'), loginRingPct: $('loginRingPct'),
     // day modal
     dayModal: $('dayModal'), dayModalDone: $('dayModalDone'),
     dayModalTitle: $('dayModalTitle'), dayModalList: $('dayModalList'),
@@ -223,13 +212,12 @@
     clearTimeout(pushTimer);
     pushTimer = setTimeout(pushRemote, 600);
   }
-  // Push the shared state to the DB (only signed-in users may write).
+  // Push the shared state to the DB (anyone can write now).
   async function pushRemote() {
-    if (!currentUser) return;
     try {
       const r = await fetch(API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-tgbls-code': USERS[currentUser] },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ events, tags }),
       });
       if (r.ok) { remoteOn = true; dirty = false; }
@@ -246,7 +234,7 @@
       const remoteTags = Array.isArray(data.tags) ? data.tags : [];
       // first run migration: DB empty but we have local data → upload it
       if (remoteEvents.length === 0 && events.length > 0) {
-        if (currentUser) pushRemote();
+        pushRemote();
       } else {
         events = remoteEvents;
         localStorage.setItem(KEY_EVENTS, JSON.stringify(events));
@@ -267,38 +255,28 @@
     pullRemote();
   }
 
-  /* ---------- Sesi / Auth ---------- */
-  function initSession() {
-    const u = localStorage.getItem(KEY_SESSION);
-    currentUser = (u === 'L' || u === 'F') ? u : null;
-    renderAuth();
+  /* ---------- Tema (Theme) ---------- */
+  function initTheme() {
+    const t = localStorage.getItem(KEY_THEME);
+    currentTheme = (t === 'pink' || t === 'dark') ? t : 'dark';
+    applyTheme();
   }
-  function renderAuth() {
-    const loggedIn = !!currentUser;
-    const isFany = currentUser === 'F';
-    document.documentElement.dataset.user = currentUser || '';
-    document.documentElement.classList.toggle('user-fany', isFany);
-    // Luigi + logged-out → dark theme. Fany → light + pink theme.
-    document.documentElement.classList.toggle('dark', !isFany);
-
-    el.loginBtn.classList.toggle('hidden', loggedIn);
-    el.userBox.classList.toggle('hidden', !loggedIn);
-    el.userBox.classList.toggle('flex', loggedIn);
-    if (loggedIn) {
-      el.userLabel.textContent = NAMES[currentUser] || currentUser;
-      el.userAvatar.textContent = currentUser;
+  function applyTheme() {
+    const isPink = currentTheme === 'pink';
+    document.documentElement.classList.toggle('user-fany', isPink);
+    document.documentElement.classList.toggle('dark', !isPink);
+    
+    // Update button elements
+    if (isPink) {
+      el.themeToggleIcon.innerHTML = `<svg class="h-5 w-5 text-pink-500 fill-pink-500" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+    } else {
+      el.themeToggleIcon.innerHTML = `<svg class="h-5 w-5 text-neutral-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3c.132 0 .263 0 .393.007a7.5 7.5 0 0 0 7.92 12.446A9 9 0 1 1 12 3z"/></svg>`;
     }
   }
-  function login(user) {
-    currentUser = user;
-    localStorage.setItem(KEY_SESSION, user);
-    renderAuth();
-  }
-  function logout() {
-    currentUser = null;
-    localStorage.removeItem(KEY_SESSION);
-    renderAuth();
-    toast('Signed out');
+  function toggleTheme() {
+    currentTheme = currentTheme === 'dark' ? 'pink' : 'dark';
+    localStorage.setItem(KEY_THEME, currentTheme);
+    applyTheme();
   }
 
   /* ---------- Render kalender ---------- */
@@ -372,7 +350,6 @@
             ${range ? `<span class="flex-shrink-0 tabular-nums">${range}</span>` : ''}
           </div>
         </div>
-        <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center self-start rounded-full border border-neutral-300 text-[10px] font-bold text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">${ev.owner}</span>
       </button>`;
   }
 
@@ -494,116 +471,6 @@
       </button>`;
   }
 
-  /* ---------- Struk statistik (receipt) ---------- */
-  function renderReceipt() {
-    const year = viewYear;
-    const st = getYearStats(String(year));
-    const now = new Date();
-    const printed = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-
-    // QR payload: TGBLS-<date>-<sum of food + movies + places + days + events>
-    const sum = st.kuliner + st.movies + st.places + st.days + st.count;
-    const dateCode = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
-    const code = `TGBLS-${dateCode}-${sum}`;
-
-    const rows = [
-      ['Total Days', st.days],
-      ['Total Hours', fmtNum(st.hours) + ' hrs'],
-      ['Total Movies', st.movies],
-      ['Total Places', st.places],
-      ['Total Food', st.kuliner],
-      ['Total Distance', fmtNum(st.distance) + ' km'],
-    ];
-    const line = (l, v) => `
-      <div class="flex items-end gap-1">
-        <span class="whitespace-nowrap">${l}</span>
-        <span class="mb-[3px] flex-1 border-b border-dotted border-neutral-400"></span>
-        <span class="whitespace-nowrap font-bold">${v}</span>
-      </div>`;
-
-    let qrImg = '';
-    if (typeof qrcode === 'function') {
-      try {
-        const qr = qrcode(0, 'M');
-        qr.addData(code);
-        qr.make();
-        qrImg = `<img src="${qr.createDataURL(4, 2)}" alt="${code}" class="mx-auto mt-3 h-20 w-20" />`;
-      } catch { qrImg = ''; }
-    }
-
-    el.receiptBody.innerHTML = `
-      <div class="text-center">
-        <p class="font-sans text-2xl font-extrabold tracking-tight">(tigabelas)</p>
-      </div>
-      <div class="my-3 border-t border-dashed border-neutral-400"></div>
-      <p class="text-center text-[11px] leading-relaxed">
-         ${year} YEAR STATISTICS<br/>Date: ${printed}
-      </p>
-      <div class="my-3 border-t border-double border-neutral-500"></div>
-      <div class="space-y-1.5 text-[13px]">${rows.map((r) => line(r[0], r[1])).join('')}</div>
-      <div class="my-3 border-t border-dashed border-neutral-400"></div>
-      <div class="text-[13px]">${line('TOTAL EVENTS', st.count)}</div>
-      <div class="my-3 border-t border-double border-neutral-500"></div>
-      <p class="text-center text-[11px] tracking-[0.2em]">*** THANK YOU ***</p>
-      ${qrImg}`;
-  }
-  function applyReceiptTransform() {
-    el.receiptArea.style.transform =
-      `rotateX(${view3d.rx}deg) rotateY(${view3d.ry}deg) scale(${view3d.scale})`;
-  }
-  function resetReceiptView() {
-    view3d.rx = 0; view3d.ry = 0; view3d.scale = 0.95;
-    applyReceiptTransform();
-  }
-  function openReceipt() {
-    renderReceipt();
-    resetReceiptView();
-    openModal(el.receiptModal);
-  }
-  async function downloadReceipt() {
-    if (typeof html2canvas !== 'function') { toast('Download module not loaded'); return; }
-    const btn = el.downloadReceiptBtn;
-    btn.disabled = true;
-    const savedTransform = el.receiptArea.style.transform;
-    el.receiptArea.style.transform = 'none';   // rata supaya hasil unduh bersih
-    try {
-      const canvas = await html2canvas(el.receiptFront, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
-      const filename = `struk-statistik-tigabelas-${viewYear}.png`;
-      const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
-      if (!blob) throw new Error('no blob');
-
-      // Mobile: open the native share sheet so the user can save to Photos/Files
-      // (iOS/Android Safari ignore the <a download> attribute).
-      const file = new File([blob], filename, { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file], title: 'tigabelas' });
-          return;
-        } catch (err) {
-          if (err && err.name === 'AbortError') return;   // user dismissed the sheet
-          // otherwise fall through to the blob-download path
-        }
-      }
-
-      // Desktop / fallback: download via an object URL (anchor must be in the DOM)
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.rel = 'noopener';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast('Receipt downloaded');
-    } catch {
-      toast('Failed to download receipt');
-    } finally {
-      el.receiptArea.style.transform = savedTransform;
-      btn.disabled = false;
-    }
-  }
-
   /* ---------- Countdown ---------- */
   // The nearest event whose date is today or later.
   function nearestEvent() {
@@ -645,8 +512,8 @@
   }
 
   /* ---------- Modal helpers ---------- */
-  const MODALS = () => [el.loginModal, el.dayModal, el.eventModal, el.tagModal, el.mapModal, el.receiptModal];
-  function anyModalOpen() { return MODALS().some((m) => !m.classList.contains('hidden')); }
+  const MODALS = () => [el.dayModal, el.eventModal, el.tagModal, el.mapModal];
+  function anyModalOpen() { return MODALS().some((m) => m && !m.classList.contains('hidden')); }
   function openModal(m) {
     m.classList.remove('hidden'); m.classList.add('flex');
     document.body.style.overflow = 'hidden';
@@ -660,65 +527,9 @@
     if (m === el.tagModal) { renderTagPicker(); renderAll(); }
   }
   function closeTopModal() {
-    for (const m of [el.receiptModal, el.mapModal, el.tagModal, el.eventModal, el.dayModal, el.loginModal]) {
-      if (!m.classList.contains('hidden')) { closeModalSmart(m); break; }
+    for (const m of [el.mapModal, el.tagModal, el.eventModal, el.dayModal]) {
+      if (m && !m.classList.contains('hidden')) { closeModalSmart(m); break; }
     }
-  }
-
-  /* ---------- Login modal ---------- */
-  const otpBoxes = () => Array.from(document.querySelectorAll('.otp-box'));
-  function clearOtp() { otpBoxes().forEach((b) => { b.value = ''; }); }
-  function focusFirstOtp() { const f = otpBoxes()[0]; if (f) f.focus(); }
-  function attemptLogin() {
-    if (loggingIn) return;
-    const code = otpBoxes().map((b) => b.value).join('');
-    if (code.length < 4) return;
-    // determine the user from the code (1305 → Luigi/L, 1304 → Fany/F)
-    const user = Object.keys(USERS).find((k) => USERS[k] === code);
-    if (user) {
-      startLoginLoading(user);
-    } else {
-      el.loginError.classList.remove('hidden');
-      clearOtp();
-      focusFirstOtp();
-    }
-  }
-  // Show a 5-second circular progress, then complete login.
-  function startLoginLoading(user) {
-    loggingIn = true;
-    el.loginForm.classList.add('hidden');
-    el.loginLoading.classList.remove('hidden');
-    el.loginLoading.classList.add('flex');
-    const C = 125.66, dur = 700, t0 = performance.now();
-    (function frame(now) {
-      // cancelled (modal closed)?
-      if (el.loginModal.classList.contains('hidden')) { loggingIn = false; resetLoginView(); return; }
-      const p = Math.min(1, (now - t0) / dur);
-      el.loginRing.style.strokeDashoffset = String(C * (1 - p));
-      el.loginRingPct.textContent = Math.round(p * 100) + '%';
-      if (p < 1) { requestAnimationFrame(frame); return; }
-      loggingIn = false;
-      login(user);
-      closeModal(el.loginModal);
-      toast(`Signed in as ${NAMES[user] || user}`);
-      resetLoginView();
-      if (!el.dayModal.classList.contains('hidden')) renderDay();
-    })(t0);
-  }
-  function resetLoginView() {
-    el.loginLoading.classList.add('hidden');
-    el.loginLoading.classList.remove('flex');
-    el.loginForm.classList.remove('hidden');
-    el.loginRing.style.strokeDashoffset = '125.66';
-    el.loginRingPct.textContent = '0%';
-  }
-  function openLogin() {
-    loggingIn = false;
-    resetLoginView();
-    clearOtp();
-    el.loginError.classList.add('hidden');
-    openModal(el.loginModal);
-    setTimeout(focusFirstOtp, 50);
   }
 
   /* ---------- Day modal (one event per date, detail-first) ---------- */
@@ -800,7 +611,6 @@
       <div class="space-y-4">
         <div class="flex items-start justify-between gap-2">
           <h4 class="min-w-0 flex-1 break-words text-lg font-bold leading-snug">${escapeHtml(ev.title)}</h4>
-          <span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-neutral-300 text-[10px] font-bold text-neutral-500 dark:border-neutral-700 dark:text-neutral-400" title="Created by ${ev.owner}">${ev.owner}</span>
         </div>
         <div class="flex flex-wrap items-center gap-1.5">${tagChips}</div>
         <div class="space-y-2 rounded-xl border border-neutral-200 p-3.5 dark:border-neutral-800">
@@ -833,20 +643,15 @@
 
     let html;
     if (!ev) {
-      // empty date → add (logged in) or login hint
-      html = currentUser
-        ? `<button type="button" id="addEventBtn"
-            class="tgbls-fill flex w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14" /></svg>
-            Add Event
-          </button>`
-        : '';
-    } else if (!currentUser) {
-      html = '';
-    } else if (isPastEvent(ev)) {
-      html = delBtn('flex w-full');               // finished event → delete only
+      // empty date → add is always available
+      html = `<button type="button" id="addEventBtn"
+          class="tgbls-fill flex w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14" /></svg>
+          Add Event
+        </button>`;
     } else {
-      html = delBtn('flex flex-1') + editBtn;      // delete (left) + edit (right)
+      // edit + delete are always available
+      html = delBtn('flex flex-1') + editBtn;
     }
     el.dayModalFooter.innerHTML = html;
     el.dayModalFooter.classList.toggle('hidden', !html);
@@ -942,7 +747,6 @@
 
   function handleEventSubmit(e) {
     e.preventDefault();
-    if (!currentUser) return;
 
     const title = el.eventTitle.value.trim();
     const date = el.eventDate.value;
@@ -970,7 +774,7 @@
       const ev = events.find((x) => x.id === id);
       if (ev) { Object.assign(ev, payload); toast('Event updated'); }
     } else {
-      events.push({ id: uid(), owner: currentUser, ...payload });
+      events.push({ id: uid(), owner: 'U', ...payload });
       toast('Event added');
     }
 
@@ -1166,8 +970,7 @@
 
   /* ---------- Event listeners ---------- */
   function bindEvents() {
-    el.loginBtn.addEventListener('click', openLogin);
-    el.logoutBtn.addEventListener('click', logout);
+    el.themeToggleBtn.addEventListener('click', toggleTheme);
 
     el.prevBtn.addEventListener('click', () => changeMonth(-1));
     el.nextBtn.addEventListener('click', () => changeMonth(1));
@@ -1181,8 +984,7 @@
     el.mapSearchBtn.addEventListener('click', () => searchPlace(el.mapSearch.value));
     el.mapSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); searchPlace(el.mapSearch.value); } });
     el.useLocationBtn.addEventListener('click', applyMapLocation);
-    el.openReceiptBtn.addEventListener('click', openReceipt);
-    el.downloadReceiptBtn.addEventListener('click', downloadReceipt);
+    el.openReceiptBtn.addEventListener('click', () => toast('Coming Soon :)'));
 
     // timeline reorder (drag the grip handle)
     el.timelineEditor.addEventListener('dragstart', (e) => {
@@ -1214,49 +1016,6 @@
     el.timelineEditor.addEventListener('dragend', () => {
       if (tlDragFrom !== null) { tlDragFrom = null; renderTimelineEditor(); }
     });
-
-    // interaksi 3D struk: seret untuk putar, scroll untuk zoom, klik dua kali reset
-    el.receiptStage.addEventListener('pointerdown', (e) => {
-      view3d.dragging = true; view3d.lx = e.clientX; view3d.ly = e.clientY;
-      el.receiptStage.style.cursor = 'grabbing';
-      el.receiptStage.setPointerCapture(e.pointerId);
-    });
-    el.receiptStage.addEventListener('pointermove', (e) => {
-      if (!view3d.dragging) return;
-      view3d.ry += (e.clientX - view3d.lx) * 0.4;
-      view3d.rx -= (e.clientY - view3d.ly) * 0.4;
-      view3d.rx = Math.max(-80, Math.min(80, view3d.rx));
-      view3d.lx = e.clientX; view3d.ly = e.clientY;
-      applyReceiptTransform();
-    });
-    const endDrag = () => { view3d.dragging = false; el.receiptStage.style.cursor = 'grab'; };
-    el.receiptStage.addEventListener('pointerup', endDrag);
-    el.receiptStage.addEventListener('pointercancel', endDrag);
-    el.receiptStage.addEventListener('pointerleave', endDrag);
-    el.receiptStage.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      view3d.scale *= e.deltaY < 0 ? 1.1 : 0.9;
-      view3d.scale = Math.max(0.4, Math.min(3.5, view3d.scale));
-      applyReceiptTransform();
-    }, { passive: false });
-    el.receiptStage.addEventListener('dblclick', resetReceiptView);
-
-    // kotak kode OTP: auto-maju, backspace mundur, auto-submit saat 4 terisi
-    const boxes = otpBoxes();
-    boxes.forEach((box, idx) => {
-      box.addEventListener('input', () => {
-        box.value = box.value.replace(/\D/g, '').slice(0, 1);
-        el.loginError.classList.add('hidden');
-        if (box.value && idx < boxes.length - 1) boxes[idx + 1].focus();
-        if (boxes.every((b) => b.value)) attemptLogin();
-      });
-      box.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && !box.value && idx > 0) { boxes[idx - 1].focus(); }
-      });
-    });
-
-    // login submit (tombol Masuk)
-    el.loginForm.addEventListener('submit', (e) => { e.preventDefault(); attemptLogin(); });
 
     el.eventForm.addEventListener('submit', handleEventSubmit);
 
@@ -1351,7 +1110,7 @@
   function init() {
     loadEvents();
     loadTags();
-    initSession();
+    initTheme();
     goToday();
     renderWeekdays();
     bindEvents();
@@ -1363,3 +1122,5 @@
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
+
