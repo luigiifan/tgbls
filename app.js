@@ -9,6 +9,12 @@
   const KEY_EVENTS = 'tigabelas.events.v1';
   const KEY_MOVIES = 'tigabelas.movies.v1';
   const KEY_THEME = 'tigabelas.theme';
+  const KEY_AUTH_USER = 'tigabelas.currentUser';
+
+  const TEST_USERS = [
+    { username: 'lgiifn', pass: '13052004', name: 'Luigi Ifan', sex: 'Him', theme: 'dark' },
+    { username: 'fany', pass: '13042003', name: 'Yousyta Fany', sex: 'Her', theme: 'pink' }
+  ];
 
   const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -17,11 +23,11 @@
   const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-
   /* ---------- State ---------- */
   let viewYear, viewMonth;       // bulan yang sedang ditampilkan (month 0-indexed)
   let events = [];               // daftar kegiatan
   let currentTheme = 'dark';     // 'dark' | 'pink'
+  let currentUser = null;        // { username, name, sex } | null
   let selectedDate = null;       // 'YYYY-MM-DD' untuk day modal
   let upcomingPage = 0;          // halaman aktif daftar kegiatan mendatang
   let currentView = 'calendar';  // 'calendar' | 'movies'
@@ -42,6 +48,17 @@
   /* ---------- Element refs ---------- */
   const $ = (id) => document.getElementById(id);
   const el = {
+    profileBtn: $('profileBtn'),
+    profileDropdown: $('profileDropdown'),
+    profileOwnerName: $('profileOwnerName'),
+    profileOwnerRole: $('profileOwnerRole'),
+    openLoginModalBtn: $('openLoginModalBtn'),
+    logoutBtn: $('logoutBtn'),
+    loginModal: $('loginModal'),
+    loginForm: $('loginForm'),
+    loginUsername: $('loginUsername'),
+    loginPassword: $('loginPassword'),
+    loginErrorMsg: $('loginErrorMsg'),
     themeToggleBtn: $('themeToggleBtn'),
     themeToggleIcon: $('themeToggleIcon'),
     navTabsContainer: $('navTabsContainer'),
@@ -59,6 +76,11 @@
     // movie controls & modal
     moviesHeaderTitleBlock: $('moviesHeaderTitleBlock'),
     moviesHeaderSearchBlock: $('moviesHeaderSearchBlock'),
+    moviesSelectControls: $('moviesSelectControls'),
+    toggleMovieSelectBtn: $('toggleMovieSelectBtn'),
+    selectAllMoviesBtn: $('selectAllMoviesBtn'),
+    deleteSelectedMoviesBtn: $('deleteSelectedMoviesBtn'),
+    cancelMovieSelectBtn: $('cancelMovieSelectBtn'),
     watchedMovieSearchInput: $('watchedMovieSearchInput'),
     clearWatchedSearchBtn: $('clearWatchedSearchBtn'),
     movieSearchIconSvg: $('movieSearchIconSvg'),
@@ -112,11 +134,17 @@
     eventModalTitle: $('eventModalTitle'), eventId: $('eventId'),
     eventTitle: $('eventTitle'), eventDate: $('eventDate'), eventDesc: $('eventDesc'),
     eventPhotoSection: $('eventPhotoSection'),
+    photoUploadActions: $('photoUploadActions'),
     eventPhotoInput: $('eventPhotoInput'), uploadPhotoBtn: $('uploadPhotoBtn'),
+    linkPhotoBtn: $('linkPhotoBtn'),
     photoPreviewContainer: $('photoPreviewContainer'), eventPhotoPreview: $('eventPhotoPreview'),
     photoCropViewport: $('photoCropViewport'), photoZoomControls: $('photoZoomControls'),
     photoZoomSlider: $('photoZoomSlider'), photoResetBtn: $('photoResetBtn'),
     removePhotoBtn: $('removePhotoBtn'),
+    // linked photo modal
+    linkedPhotoModal: $('linkedPhotoModal'),
+    linkedPhotoTabs: $('linkedPhotoTabs'),
+    linkedPhotoGrid: $('linkedPhotoGrid'),
     toastContainer: $('toastContainer'),
   };
 
@@ -202,68 +230,19 @@
     return result;
   }
 
-  const SAMPLE_MOVIES_LIST = [
-    { title: 'Inception', year: '2010', rating: '9.0', date: '2026-07-10' },
-    { title: 'Interstellar', year: '2014', rating: '9.5', date: '2026-07-14' },
-    { title: 'Spider-Man: Across the Spider-Verse', year: '2023', rating: '9.0', date: '2026-07-18' },
-    { title: 'Oppenheimer', year: '2023', rating: '8.5', date: '2026-07-22' },
-    { title: 'The Dark Knight', year: '2008', rating: '10.0', date: '2026-07-25' },
-    { title: 'Dune: Part Two', year: '2024', rating: '9.0', date: '2026-07-28' },
-    { title: 'Everything Everywhere All at Once', year: '2022', rating: '8.5', date: '2026-08-01' },
-    { title: 'Spirited Away', year: '2001', rating: '9.5', date: '2026-08-03' },
-    { title: 'La La Land', year: '2016', rating: '8.0', date: '2026-08-05' },
-    { title: 'Parasite', year: '2019', rating: '9.0', date: '2026-08-07' },
-    { title: 'Guardians of the Galaxy Vol. 3', year: '2023', rating: '8.5', date: '2026-08-09' },
-    { title: 'Whiplash', year: '2014', rating: '9.0', date: '2026-08-11' },
-    { title: 'Coco', year: '2017', rating: '8.5', date: '2026-08-12' },
-    { title: 'Your Name.', year: '2016', rating: '9.0', date: '2026-08-14' },
-    { title: 'Avatar: The Way of Water', year: '2022', rating: '7.5', date: '2026-08-15' },
-    { title: 'The Batman', year: '2022', rating: '8.0', date: '2026-08-16' },
-    { title: 'Inside Out 2', year: '2024', rating: '8.5', date: '2026-08-17' },
-    { title: 'Top Gun: Maverick', year: '2022', rating: '8.5', date: '2026-08-18' },
-    { title: 'Suzume', year: '2022', rating: '8.0', date: '2026-08-19' },
-    { title: 'Spider-Man: Into the Spider-Verse', year: '2018', rating: '9.5', date: '2026-08-20' },
-  ];
-
-  function ensureSampleMovies() {
-    const existingTitles = new Set(movies.map((m) => (m.title || '').trim().toLowerCase()));
-    let added = false;
-    SAMPLE_MOVIES_LIST.forEach((item, idx) => {
-      const lower = item.title.toLowerCase();
-      if (!existingTitles.has(lower)) {
-        movies.push({
-          id: `sample_mov_${idx + 1}_${Date.now().toString(36)}`,
-          title: item.title,
-          year: item.year,
-          poster: '',
-          ticket: '',
-          rating: item.rating,
-          date: item.date,
-        });
-        existingTitles.add(lower);
-        added = true;
-      }
-    });
-    if (added) {
-      movies = deduplicateMovies(movies);
-      saveMovies();
-    }
-  }
-
   function loadEvents() {
     try { events = JSON.parse(localStorage.getItem(KEY_EVENTS)) || []; }
     catch { events = []; }
     try {
       const cached = JSON.parse(localStorage.getItem(KEY_MOVIES));
       if (Array.isArray(cached)) {
-        movies = deduplicateMovies(cached.filter((m) => m && m.id && !LEGACY_DUMMY_IDS.has(m.id)));
+        movies = deduplicateMovies(cached.filter((m) => m && m.id && !m.id.startsWith('sample_mov_')));
       } else {
         movies = [];
       }
     } catch {
       movies = [];
     }
-    ensureSampleMovies();
   }
   function saveEvents() {
     try {
@@ -314,17 +293,11 @@
       }
 
       if (Array.isArray(data.movies)) {
-        const cleanRemote = data.movies.filter((m) => m && m.id);
-        if (cleanRemote.length > 0) {
-          movies = deduplicateMovies(cleanRemote);
-          try { localStorage.setItem(KEY_MOVIES, JSON.stringify(movies)); } catch {}
-        } else {
-          ensureSampleMovies();
-          if (movies.length > 0) pushRemote();
-        }
+        const cleanRemote = data.movies.filter((m) => m && m.id && !m.id.startsWith('sample_mov_'));
+        movies = deduplicateMovies(cleanRemote);
+        try { localStorage.setItem(KEY_MOVIES, JSON.stringify(movies)); } catch {}
       } else {
-        ensureSampleMovies();
-        if (movies.length > 0) pushRemote();
+        movies = [];
       }
 
       renderAll();
@@ -341,8 +314,18 @@
 
   /* ---------- Tema (Theme) ---------- */
   function initTheme() {
-    const t = localStorage.getItem(KEY_THEME);
-    currentTheme = (t === 'pink' || t === 'dark') ? t : 'dark';
+    if (currentUser && currentUser.username) {
+      const userTheme = localStorage.getItem(`tigabelas.theme.${currentUser.username}`);
+      if (userTheme === 'pink' || userTheme === 'dark') {
+        currentTheme = userTheme;
+      } else {
+        const matched = TEST_USERS.find((u) => u.username === currentUser.username);
+        currentTheme = (matched && matched.theme) ? matched.theme : 'dark';
+      }
+    } else {
+      const t = localStorage.getItem(KEY_THEME);
+      currentTheme = (t === 'pink' || t === 'dark') ? t : 'dark';
+    }
     applyTheme();
   }
   function applyTheme() {
@@ -350,18 +333,122 @@
     document.documentElement.classList.toggle('user-fany', isPink);
     document.documentElement.classList.toggle('dark', !isPink);
     
-    // Update button elements
-    if (isPink) {
-      el.themeToggleIcon.innerHTML = `<svg class="h-5 w-5 text-pink-500 fill-pink-500" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
-    } else {
-      el.themeToggleIcon.innerHTML = `<svg class="h-5 w-5 text-neutral-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3c.132 0 .263 0 .393.007a7.5 7.5 0 0 0 7.92 12.446A9 9 0 1 1 12 3z"/></svg>`;
+    // Update theme toggle icon, label, and switch inside the profile dropdown
+    if (el.themeToggleIcon) {
+      if (isPink) {
+        el.themeToggleIcon.innerHTML = `<svg class="h-4 w-4 text-pink-500 fill-pink-500" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+      } else {
+        el.themeToggleIcon.innerHTML = `<svg class="h-4 w-4 text-neutral-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3c.132 0 .263 0 .393.007a7.5 7.5 0 0 0 7.92 12.446A9 9 0 1 1 12 3z"/></svg>`;
+      }
+    }
+    const themeLabel = $('themeLabelText');
+    if (themeLabel) {
+      themeLabel.textContent = isPink ? 'Light Mode' : 'Dark Mode';
+    }
+    const switchTrack = $('themeSwitchTrack');
+    const switchThumb = $('themeSwitchThumb');
+    if (switchTrack && switchThumb) {
+      if (!isPink) {
+        // Dark mode is active
+        switchTrack.className = 'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-neutral-900 dark:bg-white';
+        switchThumb.className = 'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-neutral-900 shadow-sm ring-0 transition duration-200 ease-in-out translate-x-4';
+      } else {
+        // Light mode is active
+        switchTrack.className = 'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-neutral-300 dark:bg-neutral-700';
+        switchThumb.className = 'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out translate-x-0';
+      }
     }
   }
   function toggleTheme() {
     currentTheme = currentTheme === 'dark' ? 'pink' : 'dark';
     localStorage.setItem(KEY_THEME, currentTheme);
+    if (currentUser && currentUser.username) {
+      localStorage.setItem(`tigabelas.theme.${currentUser.username}`, currentTheme);
+    }
     applyTheme();
     if (!el.dayModal.classList.contains('hidden')) renderDay();
+  }
+
+  /* ---------- Authentication ---------- */
+  function initAuth() {
+    const saved = localStorage.getItem(KEY_AUTH_USER);
+    if (saved) {
+      try {
+        currentUser = JSON.parse(saved);
+      } catch (e) {
+        currentUser = null;
+      }
+    }
+    renderAuthState();
+  }
+
+  function renderAuthState() {
+    const headerInfo = $('profileHeaderInfo');
+    const ownerName = $('profileOwnerName');
+    const ownerRole = $('profileOwnerRole');
+    const loginBtn = $('openLoginModalBtn');
+    const logoutBtn = $('logoutBtn');
+
+    // Blur protected containers in guest mode (not logged in)
+    document.documentElement.classList.toggle('is-guest', !currentUser);
+
+    if (currentUser) {
+      if (headerInfo) headerInfo.classList.remove('hidden');
+      if (ownerName) ownerName.textContent = currentUser.name;
+      if (ownerRole) ownerRole.textContent = currentUser.sex;
+      if (loginBtn) loginBtn.classList.add('hidden');
+      if (logoutBtn) {
+        logoutBtn.classList.remove('hidden');
+        logoutBtn.classList.add('flex');
+      }
+    } else {
+      if (headerInfo) headerInfo.classList.add('hidden');
+      if (loginBtn) {
+        loginBtn.classList.remove('hidden');
+        loginBtn.classList.add('flex');
+      }
+      if (logoutBtn) logoutBtn.classList.add('hidden');
+    }
+  }
+
+  function handleLoginSubmit(e) {
+    e.preventDefault();
+    const username = (el.loginUsername ? el.loginUsername.value : '').trim().toLowerCase();
+    const password = (el.loginPassword ? el.loginPassword.value : '').trim();
+
+    const matchedUser = TEST_USERS.find(
+      (u) => u.username.toLowerCase() === username && u.pass === password
+    );
+
+    if (matchedUser) {
+      currentUser = {
+        username: matchedUser.username,
+        name: matchedUser.name,
+        sex: matchedUser.sex
+      };
+      localStorage.setItem(KEY_AUTH_USER, JSON.stringify(currentUser));
+
+      // Load user's saved theme preference or default
+      const savedUserTheme = localStorage.getItem(`tigabelas.theme.${matchedUser.username}`);
+      currentTheme = (savedUserTheme === 'pink' || savedUserTheme === 'dark') ? savedUserTheme : (matchedUser.theme || 'dark');
+      localStorage.setItem(KEY_THEME, currentTheme);
+      applyTheme();
+
+      renderAuthState();
+      if (el.loginErrorMsg) el.loginErrorMsg.classList.add('hidden');
+      if (el.loginForm) el.loginForm.reset();
+      closeModal(el.loginModal);
+      if (el.profileDropdown) el.profileDropdown.classList.add('hidden');
+    } else {
+      if (el.loginErrorMsg) el.loginErrorMsg.classList.remove('hidden');
+    }
+  }
+
+  function handleLogout() {
+    currentUser = null;
+    localStorage.removeItem(KEY_AUTH_USER);
+    renderAuthState();
+    if (el.profileDropdown) el.profileDropdown.classList.add('hidden');
   }
 
   /* ---------- Render kalender ---------- */
@@ -502,7 +589,7 @@
     el.upcomingPager.classList.add('flex');
     const navBtn = (data, dis, svg) =>
       `<button type="button" ${data} ${dis ? 'disabled' : ''}
-        class="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 transition hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent dark:border-neutral-800 dark:hover:bg-neutral-800">${svg}</button>`;
+        class="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 transition hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent dark:border-neutral-800 dark:hover:bg-neutral-800">${svg}</button>`;
     el.upcomingPager.innerHTML = `
       ${navBtn('data-up-prev', upcomingPage === 0, '<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>')}
       <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">${upcomingPage + 1} / ${totalPages}</span>
@@ -551,8 +638,7 @@
 
     if (el.statsDaysProgress) {
       el.statsDaysProgress.innerHTML = `
-        <button type="button" data-category-page="calendar"
-          class="group relative w-full cursor-pointer rounded-xl bg-neutral-50 p-4 text-left transition dark:bg-neutral-800/50 hover:bg-neutral-100/90 dark:hover:bg-neutral-800">
+        <div class="group relative w-full rounded-xl bg-neutral-50 p-4 text-left dark:bg-neutral-800/50">
           <!-- Pop up tooltip on hover (below progress bar) -->
           <div class="pointer-events-none absolute -bottom-11 left-1/2 -translate-x-1/2 z-20 flex scale-95 items-center gap-1.5 whitespace-nowrap rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xl opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100 dark:bg-neutral-100 dark:text-neutral-900">
             <span>${st.count} Total Events</span>
@@ -561,14 +647,13 @@
 
           <div class="mb-3 flex items-center justify-between">
             <div class="flex items-center gap-1.5 text-neutral-400 dark:text-neutral-500">
-              <svg class="h-4 w-4 flex-shrink-0 transition group-hover:text-neutral-900 dark:group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />
+              <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
               </svg>
-              <span class="text-[11px] font-medium leading-tight text-neutral-500 transition group-hover:text-neutral-900 dark:text-neutral-400 dark:group-hover:text-white">Days</span>
+              <span class="text-[11px] font-medium leading-tight text-neutral-500 dark:text-neutral-400">Days</span>
             </div>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center">
               <span class="text-xs font-bold text-neutral-900 dark:text-white">${pctFormatted}%</span>
-              <svg class="h-3.5 w-3.5 text-neutral-400 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
             </div>
           </div>
           <div class="relative h-2.5 w-full overflow-hidden rounded-full bg-neutral-200/70 dark:bg-neutral-700/60">
@@ -587,7 +672,7 @@
             <span class="absolute -translate-x-1/2" style="left: 50%">50%</span>
             <span class="absolute -translate-x-1/2" style="left: 90%">90%</span>
           </div>
-        </button>`;
+        </div>`;
     }
 
     const STATS = [
@@ -614,8 +699,13 @@
   /* ---------- Movies View ---------- */
   let isWatchedSearchActive = false;
   let watchedMovieQuery = '';
+  let isMovieSelectMode = false;
+  const selectedMovieIds = new Set();
 
   function toggleWatchedMovieSearch(forceOpen) {
+    if (isMovieSelectMode) {
+      setMovieSelectMode(false);
+    }
     isWatchedSearchActive = (typeof forceOpen === 'boolean') ? forceOpen : !isWatchedSearchActive;
 
     if (el.moviesHeaderSearchBlock) {
@@ -624,6 +714,9 @@
     }
     if (el.openAddMovieBtn) {
       el.openAddMovieBtn.classList.toggle('hidden', isWatchedSearchActive);
+    }
+    if (el.toggleMovieSelectBtn) {
+      el.toggleMovieSelectBtn.classList.toggle('hidden', isWatchedSearchActive || movies.length === 0);
     }
     if (el.moviesPager) {
       el.moviesPager.classList.toggle('hidden', isWatchedSearchActive);
@@ -642,6 +735,96 @@
       moviesPage = 0;
       renderMoviesGrid();
     }
+  }
+
+  function setMovieSelectMode(active) {
+    if (active && isWatchedSearchActive) {
+      toggleWatchedMovieSearch(false);
+    }
+    isMovieSelectMode = active;
+    if (!active) {
+      selectedMovieIds.clear();
+    }
+    updateMovieSelectControls();
+    renderMoviesGrid();
+  }
+
+  function updateMovieSelectControls() {
+    if (el.toggleMovieSelectBtn) {
+      el.toggleMovieSelectBtn.classList.toggle('hidden', isMovieSelectMode || isWatchedSearchActive || movies.length === 0);
+    }
+    if (el.openAddMovieBtn) {
+      el.openAddMovieBtn.classList.toggle('hidden', isMovieSelectMode || isWatchedSearchActive);
+    }
+    if (el.openMovieSearchBtn) {
+      el.openMovieSearchBtn.classList.toggle('hidden', isMovieSelectMode);
+    }
+    if (el.moviesPager) {
+      el.moviesPager.classList.toggle('hidden', isMovieSelectMode || isWatchedSearchActive);
+    }
+    if (el.moviesSelectControls) {
+      el.moviesSelectControls.classList.toggle('hidden', !isMovieSelectMode);
+      el.moviesSelectControls.classList.toggle('flex', isMovieSelectMode);
+    }
+    if (el.deleteSelectedMoviesBtn) {
+      el.deleteSelectedMoviesBtn.disabled = selectedMovieIds.size === 0;
+    }
+  }
+
+  function toggleMovieSelection(id) {
+    if (selectedMovieIds.has(id)) {
+      selectedMovieIds.delete(id);
+    } else {
+      selectedMovieIds.add(id);
+    }
+    if (el.deleteSelectedMoviesBtn) {
+      el.deleteSelectedMoviesBtn.disabled = selectedMovieIds.size === 0;
+    }
+    if (el.moviesProgressSubtitle && isMovieSelectMode) {
+      el.moviesProgressSubtitle.textContent = `${selectedMovieIds.size} selected`;
+    }
+    renderMoviesGrid();
+  }
+
+  function toggleSelectAllMovies() {
+    const filtered = watchedMovieQuery
+      ? movies.filter((m) => {
+          const q = watchedMovieQuery.toLowerCase();
+          const title = (m.title || '').toLowerCase();
+          const year = String(m.year || '');
+          return title.includes(q) || year.includes(q);
+        })
+      : movies;
+
+    const allSelected = filtered.length > 0 && filtered.every((m) => selectedMovieIds.has(m.id));
+    if (allSelected) {
+      filtered.forEach((m) => selectedMovieIds.delete(m.id));
+    } else {
+      filtered.forEach((m) => selectedMovieIds.add(m.id));
+    }
+
+    if (el.deleteSelectedMoviesBtn) {
+      el.deleteSelectedMoviesBtn.disabled = selectedMovieIds.size === 0;
+    }
+    if (el.moviesProgressSubtitle && isMovieSelectMode) {
+      el.moviesProgressSubtitle.textContent = `${selectedMovieIds.size} selected`;
+    }
+    renderMoviesGrid();
+  }
+
+  function handleDeleteSelectedMovies() {
+    if (selectedMovieIds.size === 0) return;
+    const count = selectedMovieIds.size;
+    const msg = count === 1 ? 'Delete 1 selected movie?' : `Delete ${count} selected movies?`;
+    if (!window.confirm(msg)) return;
+
+    movies = movies.filter((m) => !selectedMovieIds.has(m.id));
+    selectedMovieIds.clear();
+    isMovieSelectMode = false;
+    saveMovies();
+    updateMovieSelectControls();
+    renderMoviesGrid();
+    renderStats();
   }
 
   function formatShortMovieDate(dateStr) {
@@ -685,6 +868,8 @@
   function renderMoviesGrid() {
     if (!el.moviesGrid) return;
 
+    updateMovieSelectControls();
+
     const filtered = watchedMovieQuery
       ? movies.filter((m) => {
           const q = watchedMovieQuery.toLowerCase();
@@ -699,10 +884,12 @@
     moviesPage = Math.max(0, Math.min(moviesPage, totalPages - 1));
 
     if (el.moviesProgressSubtitle) {
-      if (watchedMovieQuery) {
+      if (isMovieSelectMode) {
+        el.moviesProgressSubtitle.textContent = `${selectedMovieIds.size} selected`;
+      } else if (watchedMovieQuery) {
         el.moviesProgressSubtitle.textContent = `${filtered.length} found`;
       } else {
-        el.moviesProgressSubtitle.textContent = totalPages > 1 ? `${moviesPage + 1} of ${totalPages}` : `${moviesPage + 1}`;
+        el.moviesProgressSubtitle.textContent = `${moviesPage + 1} of ${totalPages}`;
       }
     }
 
@@ -719,17 +906,42 @@
       el.moviesGrid.innerHTML = pageMovies.map((m) => {
         const formattedDate = formatShortMovieDate(m.date);
         const hasTicket = Boolean(m.ticket);
+        const isSelected = isMovieSelectMode && selectedMovieIds.has(m.id);
 
-        const visualBox = hasTicket ? `
-          <div data-movie-cover class="group relative aspect-square w-full overflow-hidden rounded-xl border border-neutral-200 bg-neutral-900 shadow-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-md dark:border-neutral-800">
-            <img src="${m.ticket}" alt="${escapeHtml(m.title)}" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
-            <div class="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5 dark:ring-white/10"></div>
-          </div>` : `
-          <div data-movie-cover class="group relative aspect-square w-full overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-neutral-100/90 flex flex-col items-center justify-center text-neutral-400 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-neutral-400 group-hover:bg-neutral-200/60 dark:border-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-500 dark:group-hover:border-neutral-600 dark:group-hover:bg-neutral-800 shadow-sm">
+        const selectionBadge = isMovieSelectMode ? `
+          <div class="pointer-events-none absolute right-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full transition-all duration-200 ${
+            isSelected
+              ? 'bg-red-500 text-white shadow-sm ring-2 ring-white dark:ring-neutral-900 scale-100'
+              : 'bg-black/50 text-transparent border border-white/70 backdrop-blur-xs scale-90'
+          }">
+            <svg class="h-3 w-3 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="3">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>` : '';
+
+        const placeholderIcon = (!hasTicket && !isSelected) ? `
             <svg class="h-6 w-6 stroke-current transition-transform duration-300 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke-width="1.8">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+            </svg>` : '';
+
+        const visualBox = hasTicket ? `
+          <div data-movie-cover class="group relative aspect-square w-full overflow-hidden rounded-xl border ${
+            isSelected
+              ? 'border-red-500 ring-2 ring-red-500 shadow-md'
+              : 'border-neutral-200 bg-neutral-900 shadow-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-md dark:border-neutral-800'
+          }">
+            <img src="${m.ticket}" alt="${escapeHtml(m.title)}" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
             <div class="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5 dark:ring-white/10"></div>
+            ${selectionBadge}
+          </div>` : `
+          <div data-movie-cover class="group relative aspect-square w-full overflow-hidden rounded-xl border flex flex-col items-center justify-center transition-all duration-300 ${
+            isSelected
+              ? 'border-red-500 ring-2 ring-red-500 shadow-md bg-red-50 dark:bg-red-950/30'
+              : 'border-dashed border-neutral-300 bg-neutral-100/90 text-neutral-400 group-hover:-translate-y-1 group-hover:border-neutral-400 group-hover:bg-neutral-200/60 dark:border-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-500 dark:group-hover:border-neutral-600 dark:group-hover:bg-neutral-800 shadow-sm'
+          }">
+            ${placeholderIcon}
+            <div class="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5 dark:ring-white/10"></div>
+            ${selectionBadge}
           </div>`;
 
         const split = splitTitleFor2Lines(m.title);
@@ -746,7 +958,7 @@
 
         return `
           <div data-open-movie-id="${m.id}"
-            class="group flex flex-col cursor-pointer select-none transition-all duration-300">
+            class="group flex flex-col cursor-pointer select-none transition-all duration-300 ${isMovieSelectMode && !isSelected ? 'opacity-70 hover:opacity-100' : ''}">
             ${visualBox}
             <div class="mt-1.5 flex flex-col items-center min-w-0 px-0.5 text-center">
               ${titleHtml}
@@ -758,7 +970,7 @@
 
     // Pager (Top Right Header)
     if (el.moviesPager) {
-      if (isWatchedSearchActive || totalPages <= 1) {
+      if (isMovieSelectMode || isWatchedSearchActive || totalPages <= 1) {
         el.moviesPager.classList.add('hidden');
         el.moviesPager.classList.remove('flex');
         el.moviesPager.innerHTML = '';
@@ -767,8 +979,9 @@
         el.moviesPager.classList.add('flex');
         const navBtn = (data, dis, svg, title) =>
           `<button type="button" ${data} ${dis ? 'disabled' : ''} title="${title}"
-            class="flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 transition hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent dark:border-neutral-800 dark:hover:bg-neutral-800">${svg}</button>`;
+            class="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 transition hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent dark:border-neutral-800 dark:hover:bg-neutral-800">${svg}</button>`;
         el.moviesPager.innerHTML = `
+          <div class="h-4 w-px bg-neutral-200 dark:bg-neutral-800 mx-0.5" aria-hidden="true"></div>
           ${navBtn('data-movie-prev', moviesPage === 0, '<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>', 'Previous page')}
           ${navBtn('data-movie-next', moviesPage === totalPages - 1, '<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>', 'Next page')}`;
       }
@@ -1130,6 +1343,9 @@
   }
 
   function switchView(view) {
+    if (view !== 'movies' && isMovieSelectMode) {
+      setMovieSelectMode(false);
+    }
     currentView = view;
     const cards = [
       { id: 'calendar', el: el.calendarCard },
@@ -1181,21 +1397,92 @@
       .filter((e) => e.date > tKey)
       .sort((a, b) => (a.date === b.date ? sortEvents(a, b) : a.date.localeCompare(b.date)))[0] || null;
   }
-  function tickCountdown() {
-    const ev = nearestEvent();
-    if (!ev) { el.countdownText.textContent = 'No upcoming events'; return; }
+  function isDateUpcoming(dateStr) {
+    if (!dateStr) return false;
+    const d = parseKey(dateStr);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() > Date.now();
+  }
 
-    // Future date: live countdown to midnight
-    const d = parseKey(ev.date); d.setHours(0, 0, 0, 0);
+  function getRemainingTime(dateStr) {
+    if (!dateStr) return { days: 0, hrs: 0, min: 0, sec: 0, total: 0 };
+    const d = parseKey(dateStr);
+    d.setHours(0, 0, 0, 0);
     const remaining = Math.max(0, d.getTime() - Date.now());
     const s = Math.floor(remaining / 1000);
     const days = Math.floor(s / 86400);
     const hrs = Math.floor((s % 86400) / 3600);
     const min = Math.floor((s % 3600) / 60);
     const sec = s % 60;
-    el.countdownText.textContent = days > 0
-      ? `${days}d ${pad(hrs)}:${pad(min)}:${pad(sec)}`
-      : `${pad(hrs)}:${pad(min)}:${pad(sec)}`;
+    return { days, hrs, min, sec, total: remaining };
+  }
+
+  function getEventCountdownProgress(evDate, evCreatedAt) {
+    if (!evDate) return 0;
+    const target = parseKey(evDate);
+    target.setHours(0, 0, 0, 0);
+    const targetTime = target.getTime();
+    const now = Date.now();
+    if (now >= targetTime) return 100;
+
+    let startTime = evCreatedAt ? new Date(evCreatedAt).getTime() : 0;
+    if (!startTime || startTime >= targetTime) {
+      const startOfMonth = new Date(target.getFullYear(), target.getMonth(), 1).getTime();
+      startTime = Math.min(startOfMonth, targetTime - 30 * 86400000);
+      if (now < startTime) startTime = now - 7 * 86400000;
+    }
+
+    const totalSpan = targetTime - startTime;
+    if (totalSpan <= 0) return 0;
+    const elapsed = now - startTime;
+    return Math.max(1, Math.min(99.5, (elapsed / totalSpan) * 100));
+  }
+
+  function formatCountdownString(dateStr) {
+    const rem = getRemainingTime(dateStr);
+    if (rem.total <= 0) return '00:00:00:00';
+    return `${pad(rem.days)}:${pad(rem.hrs)}:${pad(rem.min)}:${pad(rem.sec)}`;
+  }
+
+  function tickCountdown() {
+    const ev = nearestEvent();
+    if (!ev) {
+      if (el.countdownText) el.countdownText.textContent = 'No upcoming events';
+    } else {
+      if (el.countdownText) el.countdownText.textContent = formatCountdownString(ev.date);
+    }
+
+    // Update any live modal countdowns & perimeter progress bars
+    let needsDayRerender = false;
+    document.querySelectorAll('[data-live-countdown]').forEach((cdEl) => {
+      const dateKey = cdEl.dataset.liveCountdown;
+      if (!dateKey) return;
+      const rem = getRemainingTime(dateKey);
+      if (rem.total <= 0) {
+        cdEl.textContent = '00:00:00:00';
+        if (selectedDate === dateKey && el.dayModal && !el.dayModal.classList.contains('hidden')) {
+          needsDayRerender = true;
+        }
+        if (el.eventModal && !el.eventModal.classList.contains('hidden')) {
+          const formDate = el.eventDate ? el.eventDate.value : selectedDate;
+          if (formDate === dateKey) renderPhotoForm();
+        }
+      } else {
+        cdEl.textContent = formatCountdownString(dateKey);
+      }
+    });
+
+    document.querySelectorAll('[data-perimeter-progress]').forEach((progEl) => {
+      const dateKey = progEl.dataset.perimeterProgress;
+      if (!dateKey) return;
+      const eventObj = eventForDate(dateKey);
+      const pct = getEventCountdownProgress(dateKey, eventObj ? eventObj.createdAt : null);
+      progEl.setAttribute('stroke-dashoffset', String((100 - pct).toFixed(2)));
+    });
+
+    if (needsDayRerender) {
+      renderDay();
+    }
   }
   function renderCountdown() { tickCountdown(); }
 
@@ -1208,7 +1495,7 @@
   }
 
   /* ---------- Modal helpers ---------- */
-  const MODALS = () => [el.imageLightboxModal, el.movieDetailModal, el.addMovieModal, el.eventModal, el.dayModal];
+  const MODALS = () => [el.imageLightboxModal, el.movieDetailModal, el.addMovieModal, el.eventModal, el.dayModal, el.linkedPhotoModal, el.loginModal];
   function anyModalOpen() { return MODALS().some((m) => m && !m.classList.contains('hidden')); }
   function openModal(m) {
     if (!m) return;
@@ -1319,9 +1606,8 @@
                 <img src="${ev.photo}" alt="Event Photo" class="h-full w-full object-cover" />
                 <div class="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-black/10 dark:ring-white/10"></div>
                 ${captionText ? `
-                  <div class="pointer-events-none absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-neutral-950/65 px-2 py-0.5 text-[10px] font-semibold text-white/90 backdrop-blur-md shadow-sm">
-                    <svg class="h-3 w-3 fill-none stroke-current" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                    <span>Read</span>
+                  <div class="pointer-events-none absolute bottom-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-black/20 text-white backdrop-blur-xs shadow-sm">
+                    <svg class="h-3 w-3 fill-none stroke-current" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
                   </div>` : ''}
               </div>
 
@@ -1345,13 +1631,58 @@
             </div>
           </div>
         </div>`;
+    } else if (isDateUpcoming(ev.date)) {
+      const progPct = getEventCountdownProgress(ev.date, ev.createdAt);
+      photoHtml = `
+        <div class="flex justify-center">
+          <div class="flex aspect-square w-full max-w-[190px] sm:max-w-[210px] flex-col items-center justify-center gap-2.5 sm:gap-3 rounded-2xl border border-dashed border-neutral-300 p-4 text-center dark:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-800/30 shadow-xs">
+            <!-- Circular Icon with Progress Ring -->
+            <div class="relative flex h-13 w-13 sm:h-15 sm:w-15 items-center justify-center">
+              <!-- SVG Progress Ring (starts at 12 o'clock / top, clockwise) -->
+              <svg class="pointer-events-none absolute inset-0 h-full w-full -rotate-90 transform" viewBox="0 0 44 44">
+                <!-- Track -->
+                <circle cx="22" cy="22" r="19" fill="none"
+                  class="stroke-neutral-200/90 dark:stroke-neutral-700/70" stroke-width="2.5" />
+                <!-- Progress -->
+                <circle cx="22" cy="22" r="19" fill="none"
+                  pathLength="100"
+                  stroke-dasharray="100"
+                  stroke-dashoffset="${(100 - progPct).toFixed(1)}"
+                  class="tgbls-stroke stroke-neutral-900 transition-[stroke-dashoffset] duration-700 dark:stroke-white"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  data-perimeter-progress="${ev.date}" />
+              </svg>
+
+              <!-- Inner Circle Icon Container -->
+              <div class="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 shadow-xs">
+                <svg class="h-5 w-5 sm:h-5.5 sm:w-5.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+
+            <div class="w-full px-0.5">
+              <p class="text-xs font-semibold text-neutral-600 dark:text-neutral-300">Event will start in</p>
+              <p class="mt-1.5 font-space text-xl sm:text-[22px] font-extrabold tracking-tighter text-neutral-900 dark:text-white tabular-nums whitespace-nowrap leading-none" data-live-countdown="${ev.date}">
+                ${formatCountdownString(ev.date)}
+              </p>
+            </div>
+          </div>
+        </div>`;
+      if (captionText) {
+        photoHtml += `
+          <div class="mt-3 px-2 text-center">
+            <span class="inline-block max-w-full text-sm font-normal text-neutral-500 dark:text-neutral-400 break-words">"${escapeHtml(captionText)}"</span>
+          </div>`;
+      }
     } else {
       photoHtml = `
         <div class="flex justify-center">
           <button type="button" data-detail-upload="${ev.id}"
-            class="group flex aspect-square w-full max-w-[190px] sm:max-w-[210px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-neutral-300 p-4 text-neutral-500 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-neutral-600 dark:hover:bg-neutral-800/40">
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-100 text-neutral-600 transition dark:bg-neutral-800 dark:text-neutral-300">
-              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            class="group flex aspect-square w-full max-w-[190px] sm:max-w-[210px] flex-col items-center justify-center gap-2.5 sm:gap-3 rounded-2xl border border-dashed border-neutral-300 p-4 text-neutral-500 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-neutral-600 dark:hover:bg-neutral-800/40">
+            <div class="flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 shadow-xs">
+              <svg class="h-6 w-6 sm:h-6.5 sm:w-6.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
@@ -1377,32 +1708,37 @@
   }
 
   function renderDayFooter(ev) {
-    // fill button gets a transparent border so it matches the outline button's box exactly
-    const editBtn = `<button type="button" data-edit="${ev ? ev.id : ''}"
-        class="tgbls-fill flex flex-1 items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
-        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4v16h16v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        Edit
-      </button>`;
-    const delBtn = (cls) => `<button type="button" data-delete="${ev ? ev.id : ''}"
-        class="${cls} items-center justify-center gap-2 rounded-xl border border-neutral-200 py-2.5 text-sm font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
-        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-        Delete
-      </button>`;
-
-    let html;
     if (!ev) {
-      // empty date → add is always available
-      html = `<button type="button" id="addEventBtn"
-          class="tgbls-fill flex w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M12 5v14M5 12h14" /></svg>
-          Add Event
-        </button>`;
+      el.dayModalFooter.innerHTML = `
+        <div class="flex w-full items-center justify-end gap-2">
+          <button type="button" data-close-modal class="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+            Close
+          </button>
+          <button type="button" id="addEventBtn"
+            class="tgbls-fill rounded-xl border border-transparent bg-clip-padding bg-neutral-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+            Add Event
+          </button>
+        </div>`;
     } else {
-      // edit + delete are always available
-      html = delBtn('flex flex-1') + editBtn;
+      el.dayModalFooter.innerHTML = `
+        <div class="flex w-full items-center justify-between gap-2">
+          <button type="button" data-delete="${ev.id}"
+            class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-50 dark:hover:bg-red-950/40">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            Delete
+          </button>
+          <div class="flex gap-2">
+            <button type="button" data-close-modal class="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+              Close
+            </button>
+            <button type="button" data-edit="${ev.id}"
+              class="tgbls-fill rounded-xl border border-transparent bg-clip-padding bg-neutral-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+              Edit
+            </button>
+          </div>
+        </div>`;
     }
-    el.dayModalFooter.innerHTML = html;
-    el.dayModalFooter.classList.toggle('hidden', !html);
+    el.dayModalFooter.classList.remove('hidden');
   }
 
   /* ---------- Photo 1:1 Cropper State (Event Modal & Day Modal) ---------- */
@@ -1598,12 +1934,20 @@
   }
 
   function renderPhotoForm() {
+    const isEdit = Boolean(el.eventId && el.eventId.value);
+    const dateVal = el.eventDate ? el.eventDate.value : selectedDate;
+    const isUpcoming = isDateUpcoming(dateVal);
+
+    if (el.eventPhotoSection) {
+      el.eventPhotoSection.classList.toggle('hidden', !isEdit || isUpcoming);
+    }
+
     if (formPhoto) {
       if (el.photoPreviewContainer) {
         el.photoPreviewContainer.classList.remove('hidden');
         el.photoPreviewContainer.classList.add('flex');
       }
-      if (el.uploadPhotoBtn) el.uploadPhotoBtn.classList.add('hidden');
+      if (el.photoUploadActions) el.photoUploadActions.classList.add('hidden');
     } else {
       cropImageObj = null;
       if (el.eventPhotoPreview) el.eventPhotoPreview.src = '';
@@ -1611,10 +1955,100 @@
         el.photoPreviewContainer.classList.add('hidden');
         el.photoPreviewContainer.classList.remove('flex');
       }
-      if (el.uploadPhotoBtn) el.uploadPhotoBtn.classList.remove('hidden');
       if (el.eventPhotoInput) el.eventPhotoInput.value = '';
       if (el.photoResetBtn) el.photoResetBtn.classList.add('hidden');
+      if (el.photoUploadActions) el.photoUploadActions.classList.remove('hidden');
     }
+  }
+
+  /* ---------- Linked Photo Library Modal ---------- */
+  let currentLinkedPhotoTab = 'all';
+
+  function openLinkedPhotoModal() {
+    if (!el.linkedPhotoModal) return;
+    currentLinkedPhotoTab = 'all';
+    updateLinkedPhotoTabs();
+    renderLinkedPhotoGrid();
+    openModal(el.linkedPhotoModal);
+  }
+
+  function updateLinkedPhotoTabs() {
+    if (!el.linkedPhotoTabs) return;
+    el.linkedPhotoTabs.querySelectorAll('[data-linked-tab]').forEach((btn) => {
+      const isTarget = btn.dataset.linkedTab === currentLinkedPhotoTab;
+      btn.className = isTarget
+        ? 'rounded-full bg-neutral-900 px-3.5 py-1 text-xs font-semibold text-white dark:bg-white dark:text-neutral-900 transition-colors'
+        : 'rounded-full px-3.5 py-1 text-xs font-semibold text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors';
+    });
+  }
+
+  function getLinkedPhotosList() {
+    const items = [];
+
+    // From Movies: ticket photos and posters
+    movies.forEach((m) => {
+      if (m.ticket) {
+        items.push({
+          id: `movie-ticket-${m.id}`,
+          type: 'movies',
+          typeLabel: 'Ticket',
+          title: m.title,
+          date: m.date,
+          src: m.ticket
+        });
+      }
+      if (m.poster) {
+        items.push({
+          id: `movie-poster-${m.id}`,
+          type: 'movies',
+          typeLabel: 'Poster',
+          title: m.title,
+          date: m.date,
+          src: m.poster
+        });
+      }
+    });
+
+    return items;
+  }
+
+  function renderLinkedPhotoGrid() {
+    if (!el.linkedPhotoGrid) return;
+    const allItems = getLinkedPhotosList();
+    const filtered = currentLinkedPhotoTab === 'all'
+      ? allItems
+      : allItems.filter((it) => it.type === currentLinkedPhotoTab);
+
+    if (!filtered.length) {
+      el.linkedPhotoGrid.innerHTML = `
+        <div class="col-span-full py-12 text-center">
+          <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <p class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No photos available</p>
+          <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+            ${currentLinkedPhotoTab === 'food' ? 'No food photos added yet.' : currentLinkedPhotoTab === 'movies' ? 'No movie photos or posters available.' : 'No photos found in your movies or food collection.'}
+          </p>
+        </div>`;
+      return;
+    }
+
+    el.linkedPhotoGrid.innerHTML = filtered.map((item) => `
+      <div data-select-linked-src="${encodeURIComponent(item.src)}"
+        class="group flex flex-col cursor-pointer select-none rounded-xl border border-neutral-200 bg-neutral-50 p-1.5 transition hover:-translate-y-0.5 hover:border-neutral-400 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-800/40 dark:hover:border-neutral-600">
+        <div class="relative aspect-square w-full overflow-hidden rounded-lg bg-neutral-900 shadow-xs">
+          <img src="${item.src}" alt="${escapeHtml(item.title)}" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+          <span class="absolute top-1 right-1 rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold text-white backdrop-blur-xs">
+            ${escapeHtml(item.typeLabel)}
+          </span>
+        </div>
+        <div class="mt-1 px-0.5 text-center min-w-0">
+          <h5 class="truncate text-[11px] font-bold text-neutral-800 dark:text-neutral-200">${escapeHtml(item.title)}</h5>
+          ${item.date ? `<p class="truncate text-[9px] text-neutral-400 dark:text-neutral-500">${escapeHtml(item.date)}</p>` : ''}
+        </div>
+      </div>`).join('');
   }
 
   /* ---------- Event form modal ---------- */
@@ -1624,7 +2058,6 @@
       const ev = events.find((e) => e.id === eventId);
       if (!ev) return;
       el.eventModalTitle.textContent = 'Edit Event';
-      if (el.eventPhotoSection) el.eventPhotoSection.classList.remove('hidden');
       el.eventId.value = ev.id;
       el.eventTitle.value = ev.title;
       el.eventDate.value = ev.date;
@@ -1638,7 +2071,6 @@
       }
     } else {
       el.eventModalTitle.textContent = 'Add Event';
-      if (el.eventPhotoSection) el.eventPhotoSection.classList.add('hidden');
       el.eventId.value = '';
       el.eventDate.value = selectedDate || todayKey();
       formPhoto = null;
@@ -1715,10 +2147,6 @@
     }
   }
 
-
-
-
-
   /* ---------- Toast ---------- */
   function toast(message) {
     if (!el.toastContainer) {
@@ -1761,16 +2189,60 @@
 
   /* ---------- Event listeners ---------- */
   function bindEvents() {
-    if (el.themeToggleBtn) el.themeToggleBtn.addEventListener('click', toggleTheme);
+    // Profile Dropdown Toggle
+    const profileBtn = $('profileBtn');
+    const profileDropdown = $('profileDropdown');
+    if (profileBtn && profileDropdown) {
+      profileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        profileDropdown.classList.toggle('hidden');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!profileDropdown.contains(e.target) && !profileBtn.contains(e.target)) {
+          profileDropdown.classList.add('hidden');
+        }
+      });
+    }
+
+    if (el.openLoginModalBtn) {
+      el.openLoginModalBtn.addEventListener('click', () => {
+        if (el.profileDropdown) el.profileDropdown.classList.add('hidden');
+        if (el.loginErrorMsg) el.loginErrorMsg.classList.add('hidden');
+        if (el.loginForm) el.loginForm.reset();
+        openModal(el.loginModal);
+      });
+    }
+    if (el.logoutBtn) {
+      el.logoutBtn.addEventListener('click', handleLogout);
+    }
+    if (el.loginForm) {
+      el.loginForm.addEventListener('submit', handleLoginSubmit);
+    }
+
+    if (el.themeToggleBtn) {
+      el.themeToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleTheme();
+      });
+    }
 
     if (el.prevBtn) el.prevBtn.addEventListener('click', () => changeMonth(-1));
     if (el.nextBtn) el.nextBtn.addEventListener('click', () => changeMonth(1));
     if (el.todayBtn) el.todayBtn.addEventListener('click', goToday);
 
     if (el.eventForm) el.eventForm.addEventListener('submit', handleEventSubmit);
+    if (el.eventDate) {
+      el.eventDate.addEventListener('input', () => renderPhotoForm());
+      el.eventDate.addEventListener('change', () => renderPhotoForm());
+    }
 
     // Movie controls & modal listeners
     if (el.openAddMovieBtn) el.openAddMovieBtn.addEventListener('click', openAddMovie);
+    if (el.toggleMovieSelectBtn) el.toggleMovieSelectBtn.addEventListener('click', () => setMovieSelectMode(true));
+    if (el.selectAllMoviesBtn) el.selectAllMoviesBtn.addEventListener('click', toggleSelectAllMovies);
+    if (el.deleteSelectedMoviesBtn) el.deleteSelectedMoviesBtn.addEventListener('click', handleDeleteSelectedMovies);
+    if (el.cancelMovieSelectBtn) el.cancelMovieSelectBtn.addEventListener('click', () => setMovieSelectMode(false));
     if (el.openMovieSearchBtn) el.openMovieSearchBtn.addEventListener('click', () => toggleWatchedMovieSearch());
     if (el.watchedMovieSearchInput) {
       el.watchedMovieSearchInput.addEventListener('input', (e) => {
@@ -1820,7 +2292,11 @@
       el.moviesGrid.addEventListener('click', (e) => {
         const card = e.target.closest('[data-open-movie-id]');
         if (card && card.dataset.openMovieId) {
-          openMovieDetail(card.dataset.openMovieId);
+          if (isMovieSelectMode) {
+            toggleMovieSelection(card.dataset.openMovieId);
+          } else {
+            openMovieDetail(card.dataset.openMovieId);
+          }
         }
       });
 
@@ -1938,6 +2414,58 @@
     }
 
     if (el.uploadPhotoBtn) el.uploadPhotoBtn.addEventListener('click', () => el.eventPhotoInput.click());
+    if (el.linkPhotoBtn) el.linkPhotoBtn.addEventListener('click', openLinkedPhotoModal);
+    if (el.linkedPhotoTabs) {
+      el.linkedPhotoTabs.addEventListener('click', (e) => {
+        const tabBtn = e.target.closest('[data-linked-tab]');
+        if (tabBtn) {
+          currentLinkedPhotoTab = tabBtn.dataset.linkedTab;
+          updateLinkedPhotoTabs();
+          renderLinkedPhotoGrid();
+        }
+      });
+    }
+
+    // Event Header Bookmark & Share handlers
+    const handleShareEvent = (title, date, desc) => {
+      const text = `${title || 'Event'}${date ? ` (${date})` : ''}${desc ? `\n"${desc}"` : ''}`;
+      if (navigator.share) {
+        navigator.share({ title: title || 'Event', text }).catch(() => {});
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).catch(() => {});
+      }
+    };
+
+    const toggleBookmarkIcon = (btn) => {
+      if (!btn) return;
+      const svg = btn.querySelector('svg');
+      const isBookmarked = btn.dataset.bookmarked === 'true';
+      if (isBookmarked) {
+        btn.dataset.bookmarked = 'false';
+        if (svg) svg.setAttribute('fill', 'none');
+        btn.classList.remove('text-amber-500', 'border-amber-400/50', 'bg-amber-50/60', 'dark:bg-amber-950/30', 'dark:border-amber-600/40');
+      } else {
+        btn.dataset.bookmarked = 'true';
+        if (svg) svg.setAttribute('fill', 'currentColor');
+        btn.classList.add('text-amber-500', 'border-amber-400/50', 'bg-amber-50/60', 'dark:bg-amber-950/30', 'dark:border-amber-600/40');
+      }
+    };
+
+    const bookmarkDayBtn = $('bookmarkDayBtn');
+    if (bookmarkDayBtn) {
+      bookmarkDayBtn.addEventListener('click', () => toggleBookmarkIcon(bookmarkDayBtn));
+    }
+    const shareDayBtn = $('shareDayBtn');
+    if (shareDayBtn) {
+      shareDayBtn.addEventListener('click', () => {
+        const ev = eventForDate(selectedDate);
+        if (ev) {
+          handleShareEvent(ev.title, ev.date, ev.desc);
+        } else {
+          handleShareEvent(el.dayModalTitle ? el.dayModalTitle.textContent : 'Event', selectedDate, '');
+        }
+      });
+    }
     if (el.eventPhotoInput) el.eventPhotoInput.addEventListener('change', async (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
@@ -2120,6 +2648,16 @@
         return;
       }
 
+      const selectLinkedBtn = e.target.closest('[data-select-linked-src]');
+      if (selectLinkedBtn) {
+        const src = decodeURIComponent(selectLinkedBtn.dataset.selectLinkedSrc);
+        if (src) {
+          loadPhotoForCropping(src);
+          if (el.linkedPhotoModal) closeModal(el.linkedPhotoModal);
+        }
+        return;
+      }
+
       const navViewBtn = e.target.closest('[data-nav-view]');
       if (navViewBtn) {
         switchView(navViewBtn.dataset.navView);
@@ -2176,8 +2714,6 @@
       const delBtn = e.target.closest('[data-delete]');
       if (delBtn) { deleteEvent(delBtn.dataset.delete); return; }
 
-
-
       // paginasi kegiatan mendatang
       if (e.target.closest('[data-up-prev]')) { if (upcomingPage > 0) { upcomingPage--; renderUpcoming(); } return; }
       if (e.target.closest('[data-up-next]')) { upcomingPage++; renderUpcoming(); return; }
@@ -2195,9 +2731,15 @@
       if (e.target.classList.contains('modal-backdrop')) { closeModalSmart(e.target.parentElement); return; }
     });
 
-    // ESC menutup modal teratas
+    // ESC menutup modal teratas atau keluar mode seleksi
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeTopModal();
+      if (e.key === 'Escape') {
+        if (isMovieSelectMode) {
+          setMovieSelectMode(false);
+          return;
+        }
+        closeTopModal();
+      }
     });
 
     // hitung ulang tinggi sidebar & paginasi saat ukuran layar berubah
@@ -2223,6 +2765,7 @@
 
   /* ---------- Init ---------- */
   function init() {
+    initAuth();
     loadEvents();
     initTheme();
     goToday();
@@ -2236,5 +2779,3 @@
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-

@@ -78,6 +78,17 @@ input[type="date"]::-webkit-date-and-time-value {
   animation: toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Guest Mode Blur Effect */
+.is-guest #calendarCard,
+.is-guest #moviesCard,
+.is-guest #foodCard,
+.is-guest #upcomingEventsCard {
+  filter: blur(8px);
+  pointer-events: none;
+  user-select: none;
+  transition: filter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Running / Marquee text for long titles */
 @keyframes marquee-scroll {
   0%, 15% {
@@ -240,8 +251,6 @@ input[type=number] {
 .user-fany #movieRatingSlider {
   accent-color: #ec4899;
 }
-
-
 
 /* Movie Card 2-Line Title Layout with Line 2 Hover Marquee */
 .movie-card-title {
