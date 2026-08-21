@@ -1,83 +1,122 @@
 /* ============================================================
    Tigabelas — Kalender Kegiatan
-   Vanilla JS · localStorage · Leaflet (OSM) · tanpa build step
+   Vanilla JS · localStorage · tanpa build step
    ============================================================ */
 (function () {
   'use strict';
 
   /* ---------- Konstanta ---------- */
   const KEY_EVENTS = 'tigabelas.events.v1';
+  const KEY_MOVIES = 'tigabelas.movies.v1';
   const KEY_THEME = 'tigabelas.theme';
-  const KEY_TAGS = 'tigabelas.tags.v1';
-
-  // Home point — used to compute distance. Change here if needed.
-  const HOME = { name: 'Sidoarjo', lat: -7.4478, lng: 112.7183 };
-
-  // Collapsed height of the stats card grid — change this value to adjust it.
-  const STATS_COLLAPSED_HEIGHT = '120px';
 
   const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
-  const WEEKDAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  // Built-in tags — fixed (cannot be renamed or removed). Everything else is custom.
-  const DEFAULT_TAGS = [
-    { id: 'tg-film', name: 'Movie', kuliner: false, movie: true },
-    { id: 'tg-kuliner', name: 'Food', kuliner: true, movie: false },
-    { id: 'tg-olahraga', name: 'Sport', kuliner: false, movie: false },
-  ];
-  const DEFAULT_TAG_IDS = new Set(DEFAULT_TAGS.map((t) => t.id));
-  const LEGACY_TAG_IDS = ['tg-jalan', 'tg-belanja']; // old seeded defaults — removed on load
 
   /* ---------- State ---------- */
   let viewYear, viewMonth;       // bulan yang sedang ditampilkan (month 0-indexed)
   let events = [];               // daftar kegiatan
-  let tags = [];                 // daftar tag tersedia
   let currentTheme = 'dark';     // 'dark' | 'pink'
   let selectedDate = null;       // 'YYYY-MM-DD' untuk day modal
-  let statsExpanded = false;     // state expand/collapse statistik
   let upcomingPage = 0;          // halaman aktif daftar kegiatan mendatang
+  let currentView = 'calendar';  // 'calendar' | 'movies'
+
+  let movies = [];
+  let moviesPage = 0;
+  function getMoviesPerPage() {
+    if (window.matchMedia('(min-width: 1280px)').matches) return 18;
+    if (window.matchMedia('(min-width: 1024px)').matches) return 15;
+    if (window.matchMedia('(min-width: 640px)').matches) return 12;
+    return 6;
+  }
 
   // State form kegiatan
-  let formTags = [];             // id tag terpilih
-  let formTimeline = [];         // [{ time, title, location }]
-  let tlDragFrom = null;         // source index while reordering timeline
-
-  // Leaflet
-  let leafletMap = null, leafletMarker = null, mapTempLocation = null;
-  let mapTarget = { type: 'timeline', index: 0 };   // location target: timeline item being edited
+  let formPhoto = null;          // photo data URL (max 1 photo)
+  let detailUploadTargetId = null; // target event ID when uploading photo from detail view
 
   /* ---------- Element refs ---------- */
   const $ = (id) => document.getElementById(id);
   const el = {
     themeToggleBtn: $('themeToggleBtn'),
     themeToggleIcon: $('themeToggleIcon'),
+    navTabsContainer: $('navTabsContainer'),
+    navActiveIndicator: $('navActiveIndicator'),
     monthTitle: $('monthTitle'), todayBtn: $('todayBtn'), countdownText: $('countdownText'),
     prevBtn: $('prevBtn'), nextBtn: $('nextBtn'),
     weekdayRow: $('weekdayRow'), calendarGrid: $('calendarGrid'),
     upcomingList: $('upcomingList'), upcomingCount: $('upcomingCount'), upcomingPager: $('upcomingPager'),
-    statsGrid: $('statsGrid'), statsFade: $('statsFade'), statsToggleWrap: $('statsToggleWrap'),
-    calendarCard: $('calendarCard'), sidebar: $('sidebar'),
+    statsDaysProgress: $('statsDaysProgress'), statsGrid: $('statsGrid'),
+    calendarCard: $('calendarCard'), moviesCard: $('moviesCard'), foodCard: $('foodCard'),
+    moviesGrid: $('moviesGrid'), moviesProgressSubtitle: $('moviesProgressSubtitle'),
+    moviesPager: $('moviesPager'),
+    sidebar: $('sidebar'),
     openReceiptBtn: $('openReceiptBtn'),
+    // movie controls & modal
+    moviesHeaderTitleBlock: $('moviesHeaderTitleBlock'),
+    moviesHeaderSearchBlock: $('moviesHeaderSearchBlock'),
+    watchedMovieSearchInput: $('watchedMovieSearchInput'),
+    clearWatchedSearchBtn: $('clearWatchedSearchBtn'),
+    movieSearchIconSvg: $('movieSearchIconSvg'),
+    movieSearchCloseSvg: $('movieSearchCloseSvg'),
+    openAddMovieBtn: $('openAddMovieBtn'),
+    openMovieSearchBtn: $('openMovieSearchBtn'),
+    addMovieModal: $('addMovieModal'),
+    addMovieForm: $('addMovieForm'),
+    movieSearchBlock: $('movieSearchBlock'),
+    movieSearchInput: $('movieSearchInput'),
+    movieSearchBtn: $('movieSearchBtn'),
+    movieSearchResults: $('movieSearchResults'),
+    selectedMovieCard: $('selectedMovieCard'),
+    selectedMoviePoster: $('selectedMoviePoster'),
+    selectedMovieTitle: $('selectedMovieTitle'),
+    selectedMovieYear: $('selectedMovieYear'),
+    clearSelectedMovieBtn: $('clearSelectedMovieBtn'),
+    movieDateInput: $('movieDateInput'),
+    movieSelectedTitle: $('movieSelectedTitle'),
+    // movie detail & rate modal
+    movieDetailModal: $('movieDetailModal'),
+    detailMovieId: $('detailMovieId'),
+    detailMoviePoster: $('detailMoviePoster'),
+    detailMovieTitle: $('detailMovieTitle'),
+    detailMovieTitleWrap: $('detailMovieTitleWrap'),
+    detailMovieMeta: $('detailMovieMeta'),
+    detailRatingInput: $('detailRatingInput'),
+    editMovieRatingBtn: $('editMovieRatingBtn'),
+    ratingViewMode: $('ratingViewMode'),
+    ratingEditMode: $('ratingEditMode'),
+    movieRatingSlider: $('movieRatingSlider'),
+    ratingSliderBubble: $('ratingSliderBubble'),
+    closeRatingEditBtn: $('closeRatingEditBtn'),
+    movieTicketInput: $('movieTicketInput'),
+    movieTicketBox: $('movieTicketBox'),
+    movieTicketEmptyState: $('movieTicketEmptyState'),
+    movieTicketPreview: $('movieTicketPreview'),
+    movieTicketOverlay: $('movieTicketOverlay'),
+    movieTicketZoomOverlay: $('movieTicketZoomOverlay'),
+    saveMovieRatingBtn: $('saveMovieRatingBtn'),
+    deleteMovieBtn: $('deleteMovieBtn'),
+    // image lightbox
+    imageLightboxModal: $('imageLightboxModal'),
+    lightboxImage: $('lightboxImage'),
     // day modal
-    dayModal: $('dayModal'), dayModalDone: $('dayModalDone'),
+    dayModal: $('dayModal'),
     dayModalTitle: $('dayModalTitle'), dayModalList: $('dayModalList'),
-    dayModalFooter: $('dayModalFooter'),
+    dayModalFooter: $('dayModalFooter'), detailPhotoInput: $('detailPhotoInput'),
     // event modal
     eventModal: $('eventModal'), eventForm: $('eventForm'),
     eventModalTitle: $('eventModalTitle'), eventId: $('eventId'),
     eventTitle: $('eventTitle'), eventDate: $('eventDate'), eventDesc: $('eventDesc'),
-    tagPicker: $('tagPicker'), timelineEditor: $('timelineEditor'),
-    manageTagsBtn: $('manageTagsBtn'), addTimelineBtn: $('addTimelineBtn'),
-    // tag modal
-    tagModal: $('tagModal'), tagManagerList: $('tagManagerList'),
-    newTagName: $('newTagName'), addTagBtn: $('addTagBtn'),
-    // map modal
-    mapModal: $('mapModal'), mapSearch: $('mapSearch'), mapSearchBtn: $('mapSearchBtn'),
-    mapSelInfo: $('mapSelInfo'), useLocationBtn: $('useLocationBtn'),
+    eventPhotoSection: $('eventPhotoSection'),
+    eventPhotoInput: $('eventPhotoInput'), uploadPhotoBtn: $('uploadPhotoBtn'),
+    photoPreviewContainer: $('photoPreviewContainer'), eventPhotoPreview: $('eventPhotoPreview'),
+    photoCropViewport: $('photoCropViewport'), photoZoomControls: $('photoZoomControls'),
+    photoZoomSlider: $('photoZoomSlider'), photoResetBtn: $('photoResetBtn'),
+    removePhotoBtn: $('removePhotoBtn'),
     toastContainer: $('toastContainer'),
   };
 
@@ -91,7 +130,6 @@
     const [y, m, d] = key.split('-').map(Number);
     return new Date(y, m - 1, d);
   }
-  function mondayIndex(jsDay) { return (jsDay + 6) % 7; }
 
   /* ---------- Util umum ---------- */
   function escapeHtml(s) {
@@ -102,73 +140,47 @@
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
-  function haversineKm(a, b) {
-    const R = 6371;
-    const toRad = (x) => (x * Math.PI) / 180;
-    const dLat = toRad(b.lat - a.lat);
-    const dLng = toRad(b.lng - a.lng);
-    const s = Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+  function compressImage(file, maxDim = 1200, quality = 0.6) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
-  const fmtNum = (n) => (n % 1 === 0 ? n : Number(n.toFixed(1)));
-  // Force a 24-hour HH:MM mask (no AM/PM). Clamps hours 0-23, minutes 0-59.
-  function maskTime(v) {
-    let d = String(v).replace(/\D/g, '').slice(0, 4);
-    if (d.length >= 2) d = String(Math.min(23, parseInt(d.slice(0, 2), 10))).padStart(2, '0') + d.slice(2);
-    if (d.length >= 4) d = d.slice(0, 2) + String(Math.min(59, parseInt(d.slice(2, 4), 10))).padStart(2, '0');
-    return d.length <= 2 ? d : d.slice(0, 2) + ':' + d.slice(2);
-  }
-  const isValidTime = (t) => /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
-
-  /* ---------- Helper kegiatan ---------- */
-  function timelineTimes(ev) {
-    return (ev.timeline || []).map((i) => i.time).filter(Boolean).sort();
-  }
-  function eventStart(ev) {
-    return timelineTimes(ev)[0] || '';
-  }
-  function eventDurationHours(ev) {
-    const t = timelineTimes(ev);
-    if (t.length < 2) return 0;
-    const toMin = (s) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
-    return Math.max(0, (toMin(t[t.length - 1]) - toMin(t[0])) / 60);
-  }
-  // Calendar indicator weight: number of timeline items; counts as 1 if no timeline.
-  function eventUnitCount(ev) {
-    const n = (ev.timeline || []).length;
-    return n > 0 ? n : 1;
-  }
-  // Finished/past event: past date, or today with last timeline time already passed.
+  // Finished/past event: past date
   function isPastEvent(ev) {
-    const tKey = todayKey();
-    if (ev.date < tKey) return true;
-    if (ev.date > tKey) return false;
-    const times = timelineTimes(ev);
-    if (!times.length) return false;
-    const now = new Date();
-    const nowHM = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-    return times[times.length - 1] < nowHM;
+    return ev.date < todayKey();
   }
   function sortEvents(a, b) {
-    const ta = eventStart(a), tb = eventStart(b);
-    if (ta && tb) return ta.localeCompare(tb) || a.title.localeCompare(b.title);
-    if (ta) return -1;
-    if (tb) return 1;
-    return a.title.localeCompare(b.title);
+    return (a.title || '').localeCompare(b.title || '');
   }
   function eventsForDate(key) {
     return events.filter((e) => e.date === key).sort(sortEvents);
   }
-  function kulinerTagIds() {
-    return new Set(tags.filter((t) => t.kuliner).map((t) => t.id));
-  }
-  function movieTagIds() {
-    return new Set(tags.filter((t) => t.movie).map((t) => t.id));
-  }
-  function locationKey(loc) {
-    return `${loc.lat.toFixed(3)},${loc.lng.toFixed(3)}`;
-  }
+
 
   /* ---------- Storage (localStorage cache + remote sync) ---------- */
   const API_URL = '/api/state';
@@ -176,36 +188,99 @@
   let dirty = false;        // local changes not yet pushed
   let pushTimer = null;
 
+  function deduplicateMovies(list) {
+    const seen = new Set();
+    const result = [];
+    for (const m of list) {
+      if (!m || !m.title) continue;
+      const key = m.title.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(m);
+      }
+    }
+    return result;
+  }
+
+  const SAMPLE_MOVIES_LIST = [
+    { title: 'Inception', year: '2010', rating: '9.0', date: '2026-07-10' },
+    { title: 'Interstellar', year: '2014', rating: '9.5', date: '2026-07-14' },
+    { title: 'Spider-Man: Across the Spider-Verse', year: '2023', rating: '9.0', date: '2026-07-18' },
+    { title: 'Oppenheimer', year: '2023', rating: '8.5', date: '2026-07-22' },
+    { title: 'The Dark Knight', year: '2008', rating: '10.0', date: '2026-07-25' },
+    { title: 'Dune: Part Two', year: '2024', rating: '9.0', date: '2026-07-28' },
+    { title: 'Everything Everywhere All at Once', year: '2022', rating: '8.5', date: '2026-08-01' },
+    { title: 'Spirited Away', year: '2001', rating: '9.5', date: '2026-08-03' },
+    { title: 'La La Land', year: '2016', rating: '8.0', date: '2026-08-05' },
+    { title: 'Parasite', year: '2019', rating: '9.0', date: '2026-08-07' },
+    { title: 'Guardians of the Galaxy Vol. 3', year: '2023', rating: '8.5', date: '2026-08-09' },
+    { title: 'Whiplash', year: '2014', rating: '9.0', date: '2026-08-11' },
+    { title: 'Coco', year: '2017', rating: '8.5', date: '2026-08-12' },
+    { title: 'Your Name.', year: '2016', rating: '9.0', date: '2026-08-14' },
+    { title: 'Avatar: The Way of Water', year: '2022', rating: '7.5', date: '2026-08-15' },
+    { title: 'The Batman', year: '2022', rating: '8.0', date: '2026-08-16' },
+    { title: 'Inside Out 2', year: '2024', rating: '8.5', date: '2026-08-17' },
+    { title: 'Top Gun: Maverick', year: '2022', rating: '8.5', date: '2026-08-18' },
+    { title: 'Suzume', year: '2022', rating: '8.0', date: '2026-08-19' },
+    { title: 'Spider-Man: Into the Spider-Verse', year: '2018', rating: '9.5', date: '2026-08-20' },
+  ];
+
+  function ensureSampleMovies() {
+    const existingTitles = new Set(movies.map((m) => (m.title || '').trim().toLowerCase()));
+    let added = false;
+    SAMPLE_MOVIES_LIST.forEach((item, idx) => {
+      const lower = item.title.toLowerCase();
+      if (!existingTitles.has(lower)) {
+        movies.push({
+          id: `sample_mov_${idx + 1}_${Date.now().toString(36)}`,
+          title: item.title,
+          year: item.year,
+          poster: '',
+          ticket: '',
+          rating: item.rating,
+          date: item.date,
+        });
+        existingTitles.add(lower);
+        added = true;
+      }
+    });
+    if (added) {
+      movies = deduplicateMovies(movies);
+      saveMovies();
+    }
+  }
+
   function loadEvents() {
     try { events = JSON.parse(localStorage.getItem(KEY_EVENTS)) || []; }
     catch { events = []; }
-  }
-  function saveEvents() { localStorage.setItem(KEY_EVENTS, JSON.stringify(events)); schedulePush(); }
-
-  // Keep only the 3 built-in defaults + custom tags. Drops legacy seeded tags
-  // (Outing/Shopping) and guarantees the built-ins exist with their fixed
-  // name + flags. Runs on every load and on every remote pull.
-  function normalizeTags() {
-    tags = (tags || []).filter((t) => t && t.id && !LEGACY_TAG_IDS.includes(t.id));
-    DEFAULT_TAGS.forEach((def, idx) => {
-      const ex = tags.find((t) => t.id === def.id);
-      if (ex) { ex.name = def.name; ex.kuliner = def.kuliner; ex.movie = def.movie; }
-      else tags.splice(idx, 0, { ...def });
-    });
-    tags.forEach((t) => {
-      if (typeof t.movie !== 'boolean') t.movie = false;
-      if (typeof t.kuliner !== 'boolean') t.kuliner = false;
-    });
-  }
-  function loadTags() {
     try {
-      const raw = localStorage.getItem(KEY_TAGS);
-      tags = raw ? JSON.parse(raw) : DEFAULT_TAGS.slice();
-    } catch { tags = DEFAULT_TAGS.slice(); }
-    normalizeTags();
-    localStorage.setItem(KEY_TAGS, JSON.stringify(tags));
+      const cached = JSON.parse(localStorage.getItem(KEY_MOVIES));
+      if (Array.isArray(cached)) {
+        movies = deduplicateMovies(cached.filter((m) => m && m.id && !LEGACY_DUMMY_IDS.has(m.id)));
+      } else {
+        movies = [];
+      }
+    } catch {
+      movies = [];
+    }
+    ensureSampleMovies();
   }
-  function saveTags() { localStorage.setItem(KEY_TAGS, JSON.stringify(tags)); schedulePush(); }
+  function saveEvents() {
+    try {
+      localStorage.setItem(KEY_EVENTS, JSON.stringify(events));
+    } catch (err) {
+      console.warn('LocalStorage write warning:', err);
+    }
+    schedulePush();
+  }
+  function saveMovies() {
+    try {
+      localStorage.setItem(KEY_MOVIES, JSON.stringify(movies));
+    } catch (err) {
+      console.warn('LocalStorage movies write warning:', err);
+    }
+    schedulePush();
+  }
 
   function schedulePush() {
     dirty = true;
@@ -218,7 +293,7 @@
       const r = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ events, tags }),
+        body: JSON.stringify({ events, tags: [], movies }),
       });
       if (r.ok) { remoteOn = true; dirty = false; }
     } catch { remoteOn = false; }
@@ -231,19 +306,27 @@
       const data = await r.json();
       remoteOn = true;
       const remoteEvents = Array.isArray(data.events) ? data.events : [];
-      const remoteTags = Array.isArray(data.tags) ? data.tags : [];
-      // first run migration: DB empty but we have local data → upload it
       if (remoteEvents.length === 0 && events.length > 0) {
         pushRemote();
       } else {
         events = remoteEvents;
-        localStorage.setItem(KEY_EVENTS, JSON.stringify(events));
+        try { localStorage.setItem(KEY_EVENTS, JSON.stringify(events)); } catch {}
       }
-      if (remoteTags.length) {
-        tags = remoteTags;
-        normalizeTags();
-        localStorage.setItem(KEY_TAGS, JSON.stringify(tags));
+
+      if (Array.isArray(data.movies)) {
+        const cleanRemote = data.movies.filter((m) => m && m.id);
+        if (cleanRemote.length > 0) {
+          movies = deduplicateMovies(cleanRemote);
+          try { localStorage.setItem(KEY_MOVIES, JSON.stringify(movies)); } catch {}
+        } else {
+          ensureSampleMovies();
+          if (movies.length > 0) pushRemote();
+        }
+      } else {
+        ensureSampleMovies();
+        if (movies.length > 0) pushRemote();
       }
+
       renderAll();
       if (!el.dayModal.classList.contains('hidden')) renderDay();
     } catch { remoteOn = false; }
@@ -252,6 +335,7 @@
   function maybePull() {
     if (dirty) return;
     if (!el.eventModal.classList.contains('hidden')) return;
+    if (el.addMovieModal && !el.addMovieModal.classList.contains('hidden')) return;
     pullRemote();
   }
 
@@ -277,6 +361,7 @@
     currentTheme = currentTheme === 'dark' ? 'pink' : 'dark';
     localStorage.setItem(KEY_THEME, currentTheme);
     applyTheme();
+    if (!el.dayModal.classList.contains('hidden')) renderDay();
   }
 
   /* ---------- Render kalender ---------- */
@@ -286,9 +371,23 @@
 
   function renderCalendar() {
     el.monthTitle.textContent = `${MONTHS[viewMonth]} ${viewYear}`;
+    
+    const now = new Date();
+    const isCurrentMonthView = viewYear === now.getFullYear() && viewMonth === now.getMonth();
+    
+    if (el.todayBtn) {
+      el.todayBtn.textContent = String(now.getDate());
+      if (isCurrentMonthView) {
+        el.todayBtn.disabled = true;
+        el.todayBtn.className = 'inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-neutral-100 text-xs font-bold text-neutral-500 cursor-default pointer-events-none dark:border-neutral-800 dark:bg-neutral-800 dark:text-neutral-400';
+      } else {
+        el.todayBtn.disabled = false;
+        el.todayBtn.className = 'inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-transparent text-xs font-bold text-neutral-800 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-800 cursor-pointer';
+      }
+    }
 
     const firstOfMonth = new Date(viewYear, viewMonth, 1);
-    const lead = mondayIndex(firstOfMonth.getDay());
+    const lead = firstOfMonth.getDay();
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
     const totalCells = Math.ceil((lead + daysInMonth) / 7) * 7;
     const tKey = todayKey();
@@ -322,7 +421,7 @@
 
       html += `
         <button type="button" data-day="${key}" ${isToday ? 'data-today' : ''}
-          class="group aspect-square flex flex-col items-center justify-between rounded-xl border ${ringClass} bg-white p-1.5 text-center transition hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/50 sm:p-2">
+          class="group aspect-square flex flex-col items-center justify-between rounded-xl border ${ringClass} bg-white p-1.5 text-center transition-all duration-200 ${isToday ? '' : 'hover:rounded-full'} hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/50 sm:p-2">
           <span ${isToday ? 'data-af' : ''} class="${numClass}">${dayNum}</span>
           ${dot}
         </button>`;
@@ -333,21 +432,26 @@
 
   function upcomingItemHTML(ev) {
     const d = parseKey(ev.date);
-    const past = ev.date < todayKey();
-    const times = timelineTimes(ev);
-    const range = times.length >= 2 ? `${times[0]} - ${times[times.length - 1]}` : (times[0] || '');
+    const past = isPastEvent(ev);
+    const innerOpacityCls = past ? 'opacity-40 transition-opacity group-hover:opacity-80' : '';
+    const badgeCls = past
+      ? 'bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500'
+      : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
+    const titleCls = past
+      ? 'text-neutral-500 dark:text-neutral-400 font-medium'
+      : 'text-neutral-900 dark:text-white font-semibold';
+
     return `
       <button type="button" data-day="${ev.date}"
-        class="flex w-full items-stretch gap-3 rounded-xl border border-neutral-200 p-3 text-left transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50 ${past ? 'opacity-50' : ''}">
-        <div class="flex w-11 flex-shrink-0 flex-col items-center justify-center rounded-lg bg-neutral-100 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+        class="group flex w-full items-center gap-3 rounded-xl border border-neutral-200 bg-white p-3 text-left transition hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800/50">
+        <div class="flex w-11 flex-shrink-0 flex-col items-center justify-center rounded-lg py-1 ${badgeCls} ${innerOpacityCls}">
           <span class="text-base font-bold leading-none">${d.getDate()}</span>
           <span class="mt-0.5 text-[10px] font-medium uppercase">${MONTHS[d.getMonth()].slice(0, 3)}</span>
         </div>
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-semibold">${escapeHtml(ev.title)}</p>
-          <div class="mt-0.5 flex items-center justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+        <div class="min-w-0 flex-1 ${innerOpacityCls}">
+          <p class="truncate text-sm ${titleCls}">${escapeHtml(ev.title)}</p>
+          <div class="mt-0.5 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
             <span class="truncate">${WEEKDAYS_LONG[d.getDay()]}</span>
-            ${range ? `<span class="flex-shrink-0 tabular-nums">${range}</span>` : ''}
           </div>
         </div>
       </button>`;
@@ -366,9 +470,10 @@
     const prefix = `${viewYear}-${pad(viewMonth + 1)}-`;
     const list = events
       .filter((e) => e.date.startsWith(prefix))
-      .sort((a, b) => (a.date === b.date ? sortEvents(a, b) : a.date.localeCompare(b.date)));
+      .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 
-    el.upcomingCount.textContent = String(list.length);
+    const upcomingActiveCount = list.filter((e) => !isPastEvent(e)).length;
+    el.upcomingCount.textContent = String(upcomingActiveCount);
 
     const isLarge = window.matchMedia('(min-width: 1024px)').matches;
     syncSidebarHeight(isLarge);
@@ -384,7 +489,7 @@
       return;
     }
 
-    // Maks 4 event per halaman; bila card pendek, daftar bisa di-scroll (lihat class lg:overflow-y-auto).
+    // Maks 4 event per halaman
     const PER_PAGE = 4;
     const totalPages = Math.ceil(list.length / PER_PAGE);
     upcomingPage = Math.min(Math.max(upcomingPage, 0), totalPages - 1);
@@ -405,93 +510,683 @@
   }
 
   /* ---------- Statistik tahunan ---------- */
-  // Locations now live on the timeline items (the event-level location was removed).
-  // Kept event.location as a fallback so older records still count.
-  function eventLocations(ev) {
-    const locs = (ev.timeline || []).map((i) => i.location).filter(Boolean);
-    if (!locs.length && ev.location) locs.push(ev.location);
-    return locs;
-  }
   function getYearStats(year) {
     const yr = events.filter((e) => e.date.startsWith(year + '-'));
-    const kSet = kulinerTagIds();
-    const mSet = movieTagIds();
-    const allLocs = yr.flatMap(eventLocations);
     return {
       count: yr.length,
       days: new Set(yr.map((e) => e.date)).size,
-      hours: yr.reduce((s, e) => s + eventDurationHours(e), 0),
-      kuliner: yr.filter((e) => (e.tags || []).some((id) => kSet.has(id))).length,
-      movies: yr.filter((e) => (e.tags || []).some((id) => mSet.has(id))).length,
-      places: new Set(allLocs.map(locationKey)).size,
-      distance: allLocs.reduce((s, loc) => s + haversineKm(HOME, loc), 0),
+      kuliner: '—',
+      movies: String(movies.length),
     };
+  }
+
+  function isLeapYear(y) {
+    return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  }
+
+  function getYearProgress(year) {
+    const y = Number(year);
+    const totalDays = isLeapYear(y) ? 366 : 365;
+    const now = new Date();
+    const currentYr = now.getFullYear();
+
+    if (y < currentYr) return { passed: totalDays, total: totalDays, pct: 100 };
+    if (y > currentYr) return { passed: 0, total: totalDays, pct: 0 };
+
+    const startOfYear = new Date(y, 0, 1);
+    const diffMs = now.getTime() - startOfYear.getTime();
+    const dayOfYear = Math.floor(diffMs / 86400000) + 1;
+    const passed = Math.min(totalDays, Math.max(0, dayOfYear));
+    const pct = Math.min(100, Math.max(0, (passed / totalDays) * 100));
+    return { passed, total: totalDays, pct };
   }
 
   function renderStats() {
     const st = getYearStats(String(viewYear));
-    // angka + unit sebagai suffix kecil
-    const unit = (n, u) => `${n}<span class="ml-0.5 text-sm font-semibold text-neutral-400 dark:text-neutral-500">${u}</span>`;
+    const yrProgress = getYearProgress(viewYear);
+    const pctFormatted = yrProgress.pct >= 1 ? yrProgress.pct.toFixed(1) : yrProgress.pct.toFixed(2);
+    const actualPct = Math.max(yrProgress.pct, yrProgress.passed > 0 ? 1 : 0);
+    const basePct = Math.min(90, actualPct);
+    const greenPct = actualPct > 90 ? actualPct - 90 : 0;
+
+    if (el.statsDaysProgress) {
+      el.statsDaysProgress.innerHTML = `
+        <button type="button" data-category-page="calendar"
+          class="group relative w-full cursor-pointer rounded-xl bg-neutral-50 p-4 text-left transition dark:bg-neutral-800/50 hover:bg-neutral-100/90 dark:hover:bg-neutral-800">
+          <!-- Pop up tooltip on hover (below progress bar) -->
+          <div class="pointer-events-none absolute -bottom-11 left-1/2 -translate-x-1/2 z-20 flex scale-95 items-center gap-1.5 whitespace-nowrap rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xl opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100 dark:bg-neutral-100 dark:text-neutral-900">
+            <span>${st.count} Total Events</span>
+            <div class="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-neutral-900 dark:bg-neutral-100"></div>
+          </div>
+
+          <div class="mb-3 flex items-center justify-between">
+            <div class="flex items-center gap-1.5 text-neutral-400 dark:text-neutral-500">
+              <svg class="h-4 w-4 flex-shrink-0 transition group-hover:text-neutral-900 dark:group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />
+              </svg>
+              <span class="text-[11px] font-medium leading-tight text-neutral-500 transition group-hover:text-neutral-900 dark:text-neutral-400 dark:group-hover:text-white">Days</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-bold text-neutral-900 dark:text-white">${pctFormatted}%</span>
+              <svg class="h-3.5 w-3.5 text-neutral-400 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+            </div>
+          </div>
+          <div class="relative h-2.5 w-full overflow-hidden rounded-full bg-neutral-200/70 dark:bg-neutral-700/60">
+            <!-- 0% to 90% theme segment -->
+            <div class="tgbls-fill absolute inset-y-0 left-0 bg-neutral-900 transition-all duration-500 dark:bg-white" data-af style="width: ${basePct}%"></div>
+            <!-- >90% green segment -->
+            ${greenPct > 0 ? `<div class="absolute inset-y-0 bg-emerald-500 transition-all duration-500" style="left: 90%; width: ${greenPct}%"></div>` : ''}
+            <div class="pointer-events-none absolute inset-0 z-10">
+              <span class="absolute inset-y-0 w-[2px] -translate-x-1/2 bg-white dark:bg-neutral-900" style="left: 10%"></span>
+              <span class="absolute inset-y-0 w-[2px] -translate-x-1/2 bg-white dark:bg-neutral-900" style="left: 50%"></span>
+              <span class="absolute inset-y-0 w-[2px] -translate-x-1/2 bg-white dark:bg-neutral-900" style="left: 90%"></span>
+            </div>
+          </div>
+          <div class="relative mt-2 h-3.5 text-[10px] font-medium text-neutral-400 dark:text-neutral-500">
+            <span class="absolute -translate-x-1/2" style="left: 10%">10%</span>
+            <span class="absolute -translate-x-1/2" style="left: 50%">50%</span>
+            <span class="absolute -translate-x-1/2" style="left: 90%">90%</span>
+          </div>
+        </button>`;
+    }
 
     const STATS = [
-      { label: 'Days', value: st.days,
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />' },
-      { label: 'Hours', value: unit(fmtNum(st.hours), 'hrs'),
-        icon: '<circle cx="12" cy="12" r="9" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3" />' },
-      { label: 'Movies', value: st.movies,
+      { id: 'movies', label: 'Movies', value: st.movies, target: 15,
         icon: '<rect x="2.5" y="4.5" width="19" height="15" rx="2" /><path stroke-linecap="round" d="M7 4.5v15M17 4.5v15M2.5 9.5H7M2.5 14.5H7M17 9.5h4.5M17 14.5h4.5" />' },
-      { label: 'Places', value: st.places,
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z" /><circle cx="12" cy="10" r="2.5" />' },
-      { label: 'Food', value: st.kuliner,
+      { id: 'food', label: 'Food', value: st.kuliner, target: 25,
         icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3" />' },
-      { label: 'Distance', value: unit(fmtNum(st.distance), 'km'),
-        icon: '<circle cx="5" cy="18" r="3" /><circle cx="19" cy="6" r="3" /><path stroke-linecap="round" d="M19 9V15a2 2 0 0 1-2 2H8m0 0 3-3m-3 3 3 3" />' },
     ];
 
     el.statsGrid.innerHTML = STATS.map((s) => `
-      <div class="flex flex-col gap-1.5 rounded-xl bg-neutral-50 p-3 dark:bg-neutral-800/50">
-        <div class="flex items-center gap-1.5 text-neutral-400 dark:text-neutral-500">
-          <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">${s.icon}</svg>
-          <span class="text-[11px] leading-tight text-neutral-500 dark:text-neutral-400">${s.label}</span>
+      <button type="button" data-category-page="${s.id}"
+        class="group flex flex-col gap-1.5 rounded-xl bg-neutral-50 p-3 text-left transition hover:bg-neutral-100/90 dark:bg-neutral-800/50 dark:hover:bg-neutral-800">
+        <div class="flex items-center justify-between text-neutral-400 dark:text-neutral-500">
+          <div class="flex items-center gap-1.5">
+            <svg class="h-4 w-4 flex-shrink-0 transition group-hover:text-neutral-900 dark:group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">${s.icon}</svg>
+            <span class="text-[11px] leading-tight text-neutral-500 transition group-hover:text-neutral-900 dark:text-neutral-400 dark:group-hover:text-white">${s.label}</span>
+          </div>
+          <svg class="h-3.5 w-3.5 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
         </div>
-        <p class="text-xl font-bold leading-none">${s.value}</p>
-      </div>`).join('');
+        <p class="text-xl font-bold leading-none">${s.value}<span class="text-xs font-semibold text-neutral-400 dark:text-neutral-500">/${s.target}</span></p>
+      </button>`).join('');
+  }
 
-    // collapsed: show top rows + a peek via the gradient (height = STATS_COLLAPSED_HEIGHT)
-    el.statsGrid.style.maxHeight = statsExpanded ? '' : STATS_COLLAPSED_HEIGHT;
-    el.statsGrid.classList.toggle('overflow-hidden', !statsExpanded);
-    el.statsFade.classList.toggle('hidden', statsExpanded);
+  /* ---------- Movies View ---------- */
+  let isWatchedSearchActive = false;
+  let watchedMovieQuery = '';
 
-    const chevDown = '<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>';
-    const chevUp = '<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18 15l-6-6-6 6"/></svg>';
-    el.statsToggleWrap.innerHTML = `
-      <button type="button" id="statsToggleBtn"
-        class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-white">
-        ${statsExpanded ? 'Show less ' + chevUp : 'Show all ' + chevDown}
-      </button>`;
+  function toggleWatchedMovieSearch(forceOpen) {
+    isWatchedSearchActive = (typeof forceOpen === 'boolean') ? forceOpen : !isWatchedSearchActive;
+
+    if (el.moviesHeaderSearchBlock) {
+      el.moviesHeaderSearchBlock.classList.toggle('hidden', !isWatchedSearchActive);
+      el.moviesHeaderSearchBlock.classList.toggle('flex', isWatchedSearchActive);
+    }
+    if (el.openAddMovieBtn) {
+      el.openAddMovieBtn.classList.toggle('hidden', isWatchedSearchActive);
+    }
+    if (el.moviesPager) {
+      el.moviesPager.classList.toggle('hidden', isWatchedSearchActive);
+    }
+    if (el.movieSearchIconSvg) el.movieSearchIconSvg.classList.toggle('hidden', isWatchedSearchActive);
+    if (el.movieSearchCloseSvg) el.movieSearchCloseSvg.classList.toggle('hidden', !isWatchedSearchActive);
+
+    if (isWatchedSearchActive) {
+      if (el.watchedMovieSearchInput) {
+        el.watchedMovieSearchInput.focus();
+      }
+    } else {
+      watchedMovieQuery = '';
+      if (el.watchedMovieSearchInput) el.watchedMovieSearchInput.value = '';
+      if (el.clearWatchedSearchBtn) el.clearWatchedSearchBtn.classList.add('hidden');
+      moviesPage = 0;
+      renderMoviesGrid();
+    }
+  }
+
+  function formatShortMovieDate(dateStr) {
+    if (!dateStr) return '';
+    if (/^\d{4}$/.test(dateStr)) return dateStr;
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      const dt = new Date(y, m, d);
+      if (!isNaN(dt.getTime())) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${d} ${months[m]} ${y}`;
+      }
+    }
+    return dateStr;
+  }
+
+  function splitTitleFor2Lines(title) {
+    if (!title) return { line1: '', line2Full: '', line2Short: '', isTwoLines: false };
+    const t = title.trim();
+    if (t.length <= 15) {
+      return { line1: t, line2Full: '', line2Short: '', isTwoLines: false };
+    }
+
+    let breakIdx = 15;
+    const spaceIdx = t.lastIndexOf(' ', 16);
+    if (spaceIdx >= 6) {
+      breakIdx = spaceIdx;
+    }
+
+    const line1 = t.slice(0, breakIdx).trim();
+    const line2Full = t.slice(breakIdx).trim();
+    const isLong = line2Full.length > 15;
+    const line2Short = isLong ? `${line2Full.slice(0, 12).trimEnd()}...` : line2Full;
+
+    return { line1, line2Full, line2Short, isTwoLines: true };
+  }
+
+  function renderMoviesGrid() {
+    if (!el.moviesGrid) return;
+
+    const filtered = watchedMovieQuery
+      ? movies.filter((m) => {
+          const q = watchedMovieQuery.toLowerCase();
+          const title = (m.title || '').toLowerCase();
+          const year = String(m.year || '');
+          return title.includes(q) || year.includes(q);
+        })
+      : movies;
+
+    const perPage = getMoviesPerPage();
+    const totalPages = Math.ceil(filtered.length / perPage) || 1;
+    moviesPage = Math.max(0, Math.min(moviesPage, totalPages - 1));
+
+    if (el.moviesProgressSubtitle) {
+      if (watchedMovieQuery) {
+        el.moviesProgressSubtitle.textContent = `${filtered.length} found`;
+      } else {
+        el.moviesProgressSubtitle.textContent = totalPages > 1 ? `${moviesPage + 1} of ${totalPages}` : `${moviesPage + 1}`;
+      }
+    }
+
+    const pageMovies = filtered.slice(moviesPage * perPage, (moviesPage + 1) * perPage);
+
+    if (!pageMovies.length) {
+      el.moviesGrid.innerHTML = `
+        <div class="col-span-full rounded-2xl border border-dashed border-neutral-200 p-8 text-center dark:border-neutral-800">
+          <p class="text-sm text-neutral-500 dark:text-neutral-400">
+            ${watchedMovieQuery ? `No watched movie found matching "${escapeHtml(watchedMovieQuery)}".` : 'No movies added yet.'}
+          </p>
+        </div>`;
+    } else {
+      el.moviesGrid.innerHTML = pageMovies.map((m) => {
+        const formattedDate = formatShortMovieDate(m.date);
+        const hasTicket = Boolean(m.ticket);
+
+        const visualBox = hasTicket ? `
+          <div data-movie-cover class="group relative aspect-square w-full overflow-hidden rounded-xl border border-neutral-200 bg-neutral-900 shadow-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-md dark:border-neutral-800">
+            <img src="${m.ticket}" alt="${escapeHtml(m.title)}" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+            <div class="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5 dark:ring-white/10"></div>
+          </div>` : `
+          <div data-movie-cover class="group relative aspect-square w-full overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-neutral-100/90 flex flex-col items-center justify-center text-neutral-400 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-neutral-400 group-hover:bg-neutral-200/60 dark:border-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-500 dark:group-hover:border-neutral-600 dark:group-hover:bg-neutral-800 shadow-sm">
+            <svg class="h-6 w-6 stroke-current transition-transform duration-300 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <div class="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-black/5 dark:ring-white/10"></div>
+          </div>`;
+
+        const split = splitTitleFor2Lines(m.title);
+        const titleHtml = split.isTwoLines ? `
+          <div class="movie-card-title text-center text-xs font-semibold text-neutral-800 dark:text-neutral-200" title="${escapeHtml(m.title)}">
+            <div class="movie-title-line1">${escapeHtml(split.line1)}</div>
+            <div class="movie-title-line2">
+              <span class="movie-line2-span" data-short="${escapeHtml(split.line2Short)}" data-full="${escapeHtml(split.line2Full)}">${escapeHtml(split.line2Short)}</span>
+            </div>
+          </div>` : `
+          <div class="movie-card-title text-center text-xs font-semibold text-neutral-800 dark:text-neutral-200" title="${escapeHtml(m.title)}">
+            <div class="movie-title-line1">${escapeHtml(split.line1)}</div>
+          </div>`;
+
+        return `
+          <div data-open-movie-id="${m.id}"
+            class="group flex flex-col cursor-pointer select-none transition-all duration-300">
+            ${visualBox}
+            <div class="mt-1.5 flex flex-col items-center min-w-0 px-0.5 text-center">
+              ${titleHtml}
+              ${formattedDate ? `<span class="mt-0.5 w-full text-center text-[10px] font-medium text-neutral-400 dark:text-neutral-500 truncate">${escapeHtml(formattedDate)}</span>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // Pager (Top Right Header)
+    if (el.moviesPager) {
+      if (isWatchedSearchActive || totalPages <= 1) {
+        el.moviesPager.classList.add('hidden');
+        el.moviesPager.classList.remove('flex');
+        el.moviesPager.innerHTML = '';
+      } else {
+        el.moviesPager.classList.remove('hidden');
+        el.moviesPager.classList.add('flex');
+        const navBtn = (data, dis, svg, title) =>
+          `<button type="button" ${data} ${dis ? 'disabled' : ''} title="${title}"
+            class="flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 transition hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent dark:border-neutral-800 dark:hover:bg-neutral-800">${svg}</button>`;
+        el.moviesPager.innerHTML = `
+          ${navBtn('data-movie-prev', moviesPage === 0, '<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>', 'Previous page')}
+          ${navBtn('data-movie-next', moviesPage === totalPages - 1, '<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>', 'Next page')}`;
+      }
+    }
+  }
+
+  /* ---------- Add Movie Logic & Search ---------- */
+  let searchDebounceTimer = null;
+  let selectedMovieData = null;
+
+  function openAddMovie() {
+    if (!el.addMovieModal) return;
+    el.addMovieForm.reset();
+    selectedMovieData = null;
+    if (el.movieSearchBlock) el.movieSearchBlock.classList.remove('hidden');
+    if (el.selectedMovieCard) {
+      el.selectedMovieCard.classList.add('hidden');
+      el.selectedMovieCard.classList.remove('flex');
+    }
+    if (el.movieDateInput) el.movieDateInput.value = todayKey();
+    openModal(el.addMovieModal);
+    setTimeout(() => {
+      if (el.movieSearchInput) el.movieSearchInput.focus();
+    }, 60);
+  }
+
+  async function searchMovies(query) {
+    const q = (query || '').trim();
+    if (!q || !el.movieSearchResults) return;
+
+    el.movieSearchResults.classList.remove('hidden');
+    el.movieSearchResults.innerHTML = `
+      <div class="flex items-center justify-center gap-2 py-4 text-xs text-neutral-500 dark:text-neutral-400">
+        <svg class="h-4 w-4 animate-spin text-neutral-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
+        <span>Searching movies...</span>
+      </div>`;
+
+    const results = [];
+    const slug = q.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    // 1. First attempt: IMDb instant suggestion API (handles typos like 'goodzilla' -> 'Godzilla')
+    try {
+      const imdbUrl = 'https://v3.sg.media-imdb.com/suggestion/x/' + encodeURIComponent(slug) + '.json';
+      const res = await fetch(imdbUrl);
+      if (res.ok) {
+        const data = await res.json();
+        const items = (data.d || []).filter((item) => item.l && (item.i || item.y));
+        items.forEach((m) => {
+          results.push({
+            name: m.l,
+            year: m.y ? String(m.y) : '',
+            poster: m.i ? m.i.imageUrl : ''
+          });
+        });
+      }
+    } catch (err) {
+      console.warn('IMDb suggestion error, falling back:', err);
+    }
+
+    // 2. Second attempt / fallback: Cinemeta API if IMDb had no items
+    if (results.length === 0) {
+      try {
+        const cmUrl = 'https://v3-cinemeta.strem.io/catalog/movie/top/search=' + encodeURIComponent(q) + '.json';
+        const res = await fetch(cmUrl);
+        if (res.ok) {
+          const data = await res.json();
+          (data.metas || []).filter((m) => m && m.name).forEach((m) => {
+            results.push({
+              name: m.name,
+              year: m.year || (m.releaseInfo ? String(m.releaseInfo).slice(0, 4) : ''),
+              poster: m.poster || (m.imdb_id ? `https://images.metahub.space/poster/small/${m.imdb_id}/img` : '')
+            });
+          });
+        }
+      } catch (err) {
+        console.warn('Cinemeta error:', err);
+      }
+    }
+
+    if (!results.length) {
+      el.movieSearchResults.innerHTML = `
+        <div class="py-4 text-center text-xs text-neutral-500 dark:text-neutral-400">
+          No movie found for "${escapeHtml(q)}".
+        </div>`;
+      return;
+    }
+
+    el.movieSearchResults.innerHTML = results.slice(0, 8).map((m) => {
+      const safeData = JSON.stringify({ title: m.name, year: m.year, poster: m.poster }).replace(/"/g, '&quot;');
+      return `
+        <button type="button" data-select-movie="${safeData}"
+          class="flex w-full items-center gap-3 rounded-lg p-2 text-left transition hover:bg-neutral-100 dark:hover:bg-neutral-800">
+          <div class="h-12 w-8 flex-shrink-0 overflow-hidden rounded bg-neutral-800">
+            ${m.poster ? `<img src="${m.poster}" alt="" class="h-full w-full object-cover" loading="lazy" onerror="this.style.display='none'" />` : ''}
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-xs font-bold text-neutral-900 dark:text-white">${escapeHtml(m.name)}</p>
+            <p class="text-[11px] text-neutral-500 dark:text-neutral-400">${escapeHtml(m.year || '—')}</p>
+          </div>
+        </button>`;
+    }).join('');
+  }
+
+  function selectMovie(data) {
+    selectedMovieData = data;
+    if (el.movieSearchBlock) el.movieSearchBlock.classList.add('hidden');
+    if (el.selectedMovieCard) {
+      el.selectedMovieCard.classList.remove('hidden');
+      el.selectedMovieCard.classList.add('flex');
+      if (el.selectedMoviePoster) el.selectedMoviePoster.src = data.poster || '';
+      if (el.selectedMovieTitle) el.selectedMovieTitle.textContent = data.title || '—';
+      if (el.selectedMovieYear) el.selectedMovieYear.textContent = data.year || '—';
+    }
+    if (el.movieSelectedTitle) el.movieSelectedTitle.value = data.title || '';
+    if (el.movieSearchInput) el.movieSearchInput.value = data.title || '';
+    if (el.movieSearchResults) el.movieSearchResults.classList.add('hidden');
+  }
+
+  function clearSelectedMovie() {
+    selectedMovieData = null;
+    if (el.selectedMovieCard) {
+      el.selectedMovieCard.classList.add('hidden');
+      el.selectedMovieCard.classList.remove('flex');
+    }
+    if (el.movieSearchBlock) el.movieSearchBlock.classList.remove('hidden');
+    if (el.movieSelectedTitle) el.movieSelectedTitle.value = '';
+    if (el.movieSearchInput) {
+      el.movieSearchInput.value = '';
+      el.movieSearchInput.focus();
+    }
+  }
+
+  function handleAddMovieSubmit(e) {
+    e.preventDefault();
+    const title = (el.movieSelectedTitle?.value || el.movieSearchInput?.value || '').trim();
+    if (!title) {
+      toast('Please enter or select a movie title');
+      return;
+    }
+
+    const poster = (selectedMovieData && selectedMovieData.poster) ? selectedMovieData.poster : '';
+    if (!poster) {
+      toast('Please select a movie from search');
+      return;
+    }
+
+    const date = (el.movieDateInput && el.movieDateInput.value) ? el.movieDateInput.value : todayKey();
+    const year = date ? date.slice(0, 4) : (selectedMovieData?.year || new Date().getFullYear().toString());
+
+    const newMovie = {
+      id: uid(),
+      title,
+      poster,
+      date,
+      year,
+      rating: ''
+    };
+
+    movies.unshift(newMovie);
+    moviesPage = 0;
+    saveMovies();
+    renderMoviesGrid();
+    renderStats();
+    closeModal(el.addMovieModal);
+
+    // Open detail & rate window immediately in input mode
+    setTimeout(() => {
+      openMovieDetail(newMovie.id, true);
+    }, 120);
+  }
+
+  /* ---------- Movie Detail & Rate Modal ---------- */
+  let activeDetailMovieId = null;
+  let activeTicketPhoto = null;
+  let isMovieDetailEditing = false;
+
+  function renderTicketPreview(photoUrl) {
+    if (photoUrl) {
+      if (el.movieTicketPreview) {
+        el.movieTicketPreview.src = photoUrl;
+        el.movieTicketPreview.classList.remove('hidden');
+      }
+      if (el.movieTicketEmptyState) el.movieTicketEmptyState.classList.add('hidden');
+      if (el.movieTicketOverlay) {
+        el.movieTicketOverlay.classList.toggle('hidden', !isMovieDetailEditing);
+      }
+      if (el.movieTicketZoomOverlay) {
+        el.movieTicketZoomOverlay.classList.toggle('hidden', isMovieDetailEditing);
+      }
+    } else {
+      if (el.movieTicketPreview) {
+        el.movieTicketPreview.src = '';
+        el.movieTicketPreview.classList.add('hidden');
+      }
+      if (el.movieTicketEmptyState) el.movieTicketEmptyState.classList.remove('hidden');
+      if (el.movieTicketOverlay) el.movieTicketOverlay.classList.add('hidden');
+      if (el.movieTicketZoomOverlay) el.movieTicketZoomOverlay.classList.add('hidden');
+    }
+  }
+
+  function updateRatingSliderBubble() {
+    if (!el.movieRatingSlider || !el.ratingSliderBubble) return;
+    const val = parseFloat(el.movieRatingSlider.value) || 0;
+    const min = parseFloat(el.movieRatingSlider.min) || 0;
+    const max = parseFloat(el.movieRatingSlider.max) || 10;
+    const pct = (val - min) / (max - min);
+
+    const thumbOffset = (0.5 - pct) * 14;
+    el.ratingSliderBubble.style.left = `calc(${pct * 100}% + ${thumbOffset}px)`;
+
+    const span = el.ratingSliderBubble.querySelector('span');
+    if (span) {
+      span.textContent = val.toFixed(1);
+    }
+
+    if (el.detailRatingInput) {
+      el.detailRatingInput.value = val > 0 ? val.toFixed(1) : '';
+    }
+  }
+
+  function setRatingEditMode(isEditing) {
+    isMovieDetailEditing = isEditing;
+    if (el.ratingViewMode) el.ratingViewMode.classList.toggle('hidden', isEditing);
+    if (el.ratingEditMode) {
+      el.ratingEditMode.classList.toggle('hidden', !isEditing);
+      el.ratingEditMode.classList.toggle('flex', isEditing);
+      if (isEditing) {
+        setTimeout(updateRatingSliderBubble, 20);
+      }
+    }
+    if (el.saveMovieRatingBtn) el.saveMovieRatingBtn.classList.toggle('hidden', !isEditing);
+    renderTicketPreview(activeTicketPhoto);
+  }
+
+  function formatMovieDate(dateStr) {
+    if (!dateStr) return '';
+    if (/^\d{4}$/.test(dateStr)) return dateStr;
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      const dt = new Date(y, m, d);
+      if (!isNaN(dt.getTime())) {
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${days[dt.getDay()]}, ${d} ${months[m]} ${y}`;
+      }
+    }
+    return dateStr;
+  }
+
+  function applyMarqueeIfOverflow(elTitle, container) {
+    if (!elTitle || !container) return;
+    elTitle.classList.remove('running-text-active');
+    container.classList.remove('running-text-wrap');
+    elTitle.style.removeProperty('--marquee-distance');
+
+    setTimeout(() => {
+      if (elTitle.scrollWidth > container.clientWidth + 2) {
+        const diff = elTitle.scrollWidth - container.clientWidth + 8;
+        elTitle.style.setProperty('--marquee-distance', `-${diff}px`);
+        container.classList.add('running-text-wrap');
+        elTitle.classList.add('running-text-active');
+      }
+    }, 60);
+  }
+
+  function openMovieDetail(id, isNew = false) {
+    const movie = movies.find((m) => m.id === id);
+    if (!movie || !el.movieDetailModal) return;
+
+    activeDetailMovieId = id;
+    if (el.detailMovieId) el.detailMovieId.value = id;
+    if (el.detailMoviePoster) el.detailMoviePoster.src = movie.poster || '';
+    if (el.detailMovieTitle) {
+      el.detailMovieTitle.textContent = movie.title || '—';
+      applyMarqueeIfOverflow(el.detailMovieTitle, el.detailMovieTitleWrap);
+    }
+    if (el.detailMovieMeta) {
+      const parts = [];
+      if (movie.date) parts.push(`Watched on ${formatMovieDate(movie.date)}`);
+      else if (movie.year) parts.push(`Released in ${movie.year}`);
+      el.detailMovieMeta.textContent = parts.join(' • ') || 'Watched Movie';
+    }
+
+    const initialRate = (movie.rating && parseFloat(movie.rating) > 0) ? parseFloat(movie.rating) : 0;
+    if (el.movieRatingSlider) el.movieRatingSlider.value = initialRate;
+    if (el.detailRatingInput) el.detailRatingInput.value = movie.rating || '';
+
+    if (isNew) {
+      setRatingEditMode(true);
+    } else {
+      setRatingEditMode(!movie.rating);
+    }
+
+    activeTicketPhoto = movie.ticket || null;
+    renderTicketPreview(activeTicketPhoto);
+
+    openModal(el.movieDetailModal);
+  }
+
+  function handleSaveMovieRating() {
+    if (!activeDetailMovieId) return;
+    const movie = movies.find((m) => m.id === activeDetailMovieId);
+    if (!movie) return;
+
+    const num = el.movieRatingSlider ? parseFloat(el.movieRatingSlider.value) : (parseFloat(el.detailRatingInput?.value) || 0);
+    if (num > 0) {
+      movie.rating = Math.min(10, Math.max(0, num)).toFixed(1);
+    } else {
+      movie.rating = '';
+    }
+
+    movie.ticket = activeTicketPhoto || '';
+
+    saveMovies();
+    renderMoviesGrid();
+    renderStats();
+
+    // Return to preview/view mode instead of closing the modal
+    if (el.detailRatingInput) {
+      el.detailRatingInput.value = movie.rating || '';
+    }
+    setRatingEditMode(false);
+  }
+
+  function handleDeleteMovie() {
+    if (!activeDetailMovieId) return;
+    const movie = movies.find((m) => m.id === activeDetailMovieId);
+    if (!movie) return;
+
+    if (!window.confirm(`Delete movie "${movie.title}" from list?`)) return;
+
+    movies = movies.filter((m) => m.id !== activeDetailMovieId);
+    saveMovies();
+    renderMoviesGrid();
+    renderStats();
+    closeModal(el.movieDetailModal);
+  }
+
+  function updateNavIndicator(view) {
+    if (!el.navTabsContainer || !el.navActiveIndicator) return;
+    const activeBtn = el.navTabsContainer.querySelector(`[data-nav-view="${view}"]`);
+    if (!activeBtn) return;
+
+    el.navActiveIndicator.style.left = `${activeBtn.offsetLeft}px`;
+    el.navActiveIndicator.style.top = `${activeBtn.offsetTop}px`;
+    el.navActiveIndicator.style.width = `${activeBtn.offsetWidth}px`;
+    el.navActiveIndicator.style.height = `${activeBtn.offsetHeight}px`;
+
+    document.querySelectorAll('[data-nav-view]').forEach((btn) => {
+      const isTarget = btn.dataset.navView === view;
+      btn.classList.toggle('text-neutral-900', isTarget);
+      btn.classList.toggle('dark:text-white', isTarget);
+      btn.classList.toggle('text-neutral-500', !isTarget);
+      btn.classList.toggle('dark:text-neutral-400', !isTarget);
+    });
+  }
+
+  function switchView(view) {
+    currentView = view;
+    const cards = [
+      { id: 'calendar', el: el.calendarCard },
+      { id: 'movies', el: el.moviesCard },
+      { id: 'food', el: el.foodCard }
+    ];
+
+    cards.forEach((c) => {
+      if (c.el) {
+        const isTarget = c.id === view;
+        c.el.classList.toggle('hidden', !isTarget);
+        if (isTarget) {
+          c.el.classList.remove('animate-view');
+          void c.el.offsetWidth; // trigger reflow for smooth re-animation
+          c.el.classList.add('animate-view');
+        }
+      }
+    });
+
+    updateNavIndicator(view);
+
+    if (view === 'movies') {
+      renderMoviesGrid();
+    } else if (view === 'calendar') {
+      renderCalendar();
+    }
+  }
+
+  function openCategoryPage(cat) {
+    if (cat === 'calendar') {
+      switchView('calendar');
+      return;
+    }
+    if (cat === 'movies') {
+      switchView('movies');
+      return;
+    }
+    if (cat === 'food') {
+      switchView('food');
+      return;
+    }
   }
 
   /* ---------- Countdown ---------- */
-  // The nearest event whose date is today or later.
+  // The nearest event in the future (after today)
   function nearestEvent() {
     const tKey = todayKey();
     return events
-      .filter((e) => e.date >= tKey)
+      .filter((e) => e.date > tKey)
       .sort((a, b) => (a.date === b.date ? sortEvents(a, b) : a.date.localeCompare(b.date)))[0] || null;
   }
   function tickCountdown() {
     const ev = nearestEvent();
     if (!ev) { el.countdownText.textContent = 'No upcoming events'; return; }
 
-    // Event day (hari H): show how many timeline items are available.
-    if (ev.date === todayKey()) {
-      el.countdownText.textContent = `${eventUnitCount(ev)} Events is Available`;
-      return;
-    }
-
-    // Future date: live countdown to its start time.
-    const [h, m] = (eventStart(ev) || '00:00').split(':').map(Number);
-    const d = parseKey(ev.date); d.setHours(h, m, 0, 0);
+    // Future date: live countdown to midnight
+    const d = parseKey(ev.date); d.setHours(0, 0, 0, 0);
     const remaining = Math.max(0, d.getTime() - Date.now());
     const s = Math.floor(remaining / 1000);
     const days = Math.floor(s / 86400);
@@ -499,7 +1194,7 @@
     const min = Math.floor((s % 3600) / 60);
     const sec = s % 60;
     el.countdownText.textContent = days > 0
-      ? `${days}:${pad(hrs)}:${pad(min)}:${pad(sec)}`
+      ? `${days}d ${pad(hrs)}:${pad(min)}:${pad(sec)}`
       : `${pad(hrs)}:${pad(min)}:${pad(sec)}`;
   }
   function renderCountdown() { tickCountdown(); }
@@ -509,25 +1204,27 @@
     renderStats();
     renderUpcoming();   // setelah kalender & stats agar pengukuran tinggi akurat
     renderCountdown();
+    if (currentView === 'movies') renderMoviesGrid();
   }
 
   /* ---------- Modal helpers ---------- */
-  const MODALS = () => [el.dayModal, el.eventModal, el.tagModal, el.mapModal];
+  const MODALS = () => [el.imageLightboxModal, el.movieDetailModal, el.addMovieModal, el.eventModal, el.dayModal];
   function anyModalOpen() { return MODALS().some((m) => m && !m.classList.contains('hidden')); }
   function openModal(m) {
+    if (!m) return;
     m.classList.remove('hidden'); m.classList.add('flex');
     document.body.style.overflow = 'hidden';
   }
   function closeModal(m) {
+    if (!m) return;
     m.classList.add('hidden'); m.classList.remove('flex');
     if (!anyModalOpen()) document.body.style.overflow = '';
   }
   function closeModalSmart(m) {
     closeModal(m);
-    if (m === el.tagModal) { renderTagPicker(); renderAll(); }
   }
   function closeTopModal() {
-    for (const m of [el.mapModal, el.tagModal, el.eventModal, el.dayModal]) {
+    for (const m of MODALS()) {
       if (m && !m.classList.contains('hidden')) { closeModalSmart(m); break; }
     }
   }
@@ -537,22 +1234,22 @@
     return events.find((e) => e.date === key) || null;
   }
   function openDay(key) {
+    const ev = eventForDate(key);
+    if (!ev) {
+      selectedDate = key;
+      openEventForm(null);
+      return;
+    }
     selectedDate = key;
     const d = parseKey(key);
-    el.dayModalTitle.textContent = `${WEEKDAYS_LONG[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    el.dayModalTitle.textContent = `${WEEKDAYS_LONG[d.getDay()].slice(0, 3)}, ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`;
     renderDay();
     openModal(el.dayModal);
   }
   function renderDay() {
     const ev = eventForDate(selectedDate);
-    el.dayModalDone.classList.toggle('hidden', !(ev && isPastEvent(ev)));
     renderDayBody(ev);
     renderDayFooter(ev);
-  }
-
-  function tagNameById(id) {
-    const t = tags.find((x) => x.id === id);
-    return t ? t.name : null;
   }
 
   function renderDayBody(ev) {
@@ -568,63 +1265,114 @@
 
   // Full detail of one event (shown directly inside the day modal).
   function eventDetailHTML(ev) {
-    const tagChips = (ev.tags || []).map((id) => {
-      const n = tagNameById(id);
-      return n ? `<span class="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">${escapeHtml(n)}</span>` : '';
-    }).join('') || '<span class="text-sm text-neutral-400">No tags</span>';
+    let captionText = '';
+    if (ev.desc && ev.desc.trim()) {
+      const raw = ev.desc.replace(/^@(luigi|fany|l|u|f):\s*/i, '').trim();
+      captionText = raw.slice(0, 50);
+    }
 
-    const times = timelineTimes(ev);
-    const range = times.length >= 2 ? `${times[0]} – ${times[times.length - 1]}` : (times[0] || '—');
-    const dur = eventDurationHours(ev);
-    const durTxt = dur ? `${fmtNum(dur)} hrs` : '—';
-
-    const tl = (ev.timeline || []).filter((i) => i.title || i.time);
-    const timeline = tl.length ? `
-      <ol>
-        ${tl.map((i, idx) => {
-          const last = idx === tl.length - 1;
-          const locLine = i.location
-            ? `<div class="mt-0.5 flex items-center gap-1 text-xs text-neutral-400 dark:text-neutral-500"><svg class="h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z"/><circle cx="12" cy="10" r="2"/></svg><span class="truncate">${escapeHtml(i.location.name)}</span></div>`
-            : '';
-          return `
-          <li class="flex gap-3">
-            <div class="flex flex-col items-center">
-              <span class="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-neutral-400 dark:bg-neutral-500"></span>
-              ${last ? '' : '<span class="w-px flex-1 bg-neutral-200 dark:bg-neutral-700"></span>'}
+    let photoHtml = '';
+    if (detailCroppingEvId === ev.id && detailCropImageObj) {
+      photoHtml = `
+        <div class="flex flex-col items-center gap-2.5">
+          <div id="detailCropViewport"
+            class="relative aspect-square w-full max-w-[190px] sm:max-w-[210px] cursor-grab select-none overflow-hidden rounded-2xl border border-neutral-300 bg-neutral-900 touch-none active:cursor-grabbing dark:border-neutral-700 shadow-inner">
+            <img id="detailCropPreview" src="${detailCropImageObj.src}" alt="Photo preview"
+              class="pointer-events-none absolute left-1/2 top-1/2 max-h-none max-w-none select-none" />
+            <div class="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-black/10 dark:ring-white/10"></div>
+            <div class="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-neutral-900/60 px-2 py-0.5 text-[10px] font-medium text-white/80 backdrop-blur-sm">
+              Drag to reposition
             </div>
-            <div class="${last ? '' : 'pb-3'} min-w-0 text-sm">
-              <div>${i.time ? `<span class="mr-1.5 font-semibold tabular-nums">${i.time}</span>` : ''}<span class="text-neutral-600 dark:text-neutral-300">${escapeHtml(i.title || '')}</span></div>
-              ${locLine}
+          </div>
+
+          <!-- Zoom slider -->
+          <div class="flex w-full max-w-[190px] sm:max-w-[210px] items-center gap-2">
+            <svg class="h-3.5 w-3.5 flex-shrink-0 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+            </svg>
+            <input type="range" id="detailZoomSlider" min="1" max="3" step="0.01" value="${detailCropZoom}"
+              class="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-neutral-200 accent-neutral-900 dark:bg-neutral-800 dark:accent-white" />
+            <svg class="h-3.5 w-3.5 flex-shrink-0 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+            </svg>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="flex w-full max-w-[190px] sm:max-w-[210px] gap-2 pt-0.5">
+            <button type="button" id="detailCancelCropBtn"
+              class="flex-1 rounded-xl border border-neutral-200 py-1.5 text-xs font-semibold text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800">
+              Cancel
+            </button>
+            <button type="button" id="detailSaveCropBtn"
+              class="tgbls-fill flex-1 rounded-xl border border-transparent bg-clip-padding bg-neutral-900 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+              Save Photo
+            </button>
+          </div>
+        </div>`;
+    } else if (ev.photo) {
+      photoHtml = `
+        <div class="flex justify-center">
+          <div class="flip-card-container aspect-square w-full max-w-[190px] sm:max-w-[210px] cursor-pointer select-none" data-flip-photo title="Click to flip & read caption">
+            <div class="flip-card-inner">
+              <!-- Front Face: Photo -->
+              <div class="flip-card-front overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-100 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                <img src="${ev.photo}" alt="Event Photo" class="h-full w-full object-cover" />
+                <div class="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-black/10 dark:ring-white/10"></div>
+                ${captionText ? `
+                  <div class="pointer-events-none absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-neutral-950/65 px-2 py-0.5 text-[10px] font-semibold text-white/90 backdrop-blur-md shadow-sm">
+                    <svg class="h-3 w-3 fill-none stroke-current" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                    <span>Read</span>
+                  </div>` : ''}
+              </div>
+
+              <!-- Back Face: Caption -->
+              <div class="flip-card-back flex h-full w-full flex-col justify-between rounded-2xl border border-neutral-200 bg-neutral-50 text-left dark:border-neutral-800 dark:bg-neutral-800/95 shadow-sm">
+                <!-- Top Header: Line starts directly at icon with matching left/right spacing -->
+                <div class="w-full px-4 pt-3.5">
+                  <div class="flex items-center justify-start border-b border-neutral-200/80 pb-2 dark:border-neutral-700/80">
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                      <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                      <span>Caption</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Middle Content: Left-aligned in reading area -->
+                <div class="flex flex-1 w-full items-center justify-start px-4 py-2 text-left">
+                  <p class="w-full m-0 text-left text-xs sm:text-sm font-normal leading-relaxed text-neutral-700 dark:text-neutral-200 break-words">${captionText ? `"${escapeHtml(captionText)}"` : `<span class="italic text-neutral-400">No caption for this memory.</span>`}</p>
+                </div>
+              </div>
             </div>
-          </li>`;
-        }).join('')}
-      </ol>` : '<p class="text-sm text-neutral-400">No timeline.</p>';
-
-    const desc = ev.desc
-      ? `<p class="whitespace-pre-line text-sm text-neutral-600 dark:text-neutral-300">${escapeHtml(ev.desc)}</p>`
-      : '<p class="text-sm text-neutral-400">—</p>';
-
-    const infoRow = (label, val) =>
-      `<div class="flex justify-between gap-3 text-sm"><span class="flex-shrink-0 text-neutral-500 dark:text-neutral-400">${label}</span><span class="min-w-0 text-right font-medium">${val}</span></div>`;
+          </div>
+        </div>`;
+    } else {
+      photoHtml = `
+        <div class="flex justify-center">
+          <button type="button" data-detail-upload="${ev.id}"
+            class="group flex aspect-square w-full max-w-[190px] sm:max-w-[210px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-neutral-300 p-4 text-neutral-500 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-neutral-600 dark:hover:bg-neutral-800/40">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-100 text-neutral-600 transition dark:bg-neutral-800 dark:text-neutral-300">
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <span class="text-xs font-semibold text-neutral-600 dark:text-neutral-300">Upload Photo</span>
+          </button>
+        </div>`;
+      if (captionText) {
+        photoHtml += `
+          <div class="mt-3 px-2 text-center">
+            <span class="inline-block max-w-full text-sm font-normal text-neutral-500 dark:text-neutral-400 break-words">"${escapeHtml(captionText)}"</span>
+          </div>`;
+      }
+    }
 
     return `
-      <div class="space-y-4">
-        <div class="flex items-start justify-between gap-2">
-          <h4 class="min-w-0 flex-1 break-words text-lg font-bold leading-snug">${escapeHtml(ev.title)}</h4>
+      <div class="space-y-3.5">
+        <div class="text-center">
+          <span class="mb-1.5 inline-block rounded-md border border-neutral-300 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">EVENT</span>
+          <h4 class="break-words text-center text-lg font-bold leading-snug">${escapeHtml(ev.title)}</h4>
         </div>
-        <div class="flex flex-wrap items-center gap-1.5">${tagChips}</div>
-        <div class="space-y-2 rounded-xl border border-neutral-200 p-3.5 dark:border-neutral-800">
-          ${infoRow('Time', range)}
-          ${infoRow('Duration', durTxt)}
-        </div>
-        <div>
-          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Timeline</p>
-          ${timeline}
-        </div>
-        <div>
-          <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">Notes</p>
-          ${desc}
-        </div>
+        ${photoHtml}
       </div>`;
   }
 
@@ -657,66 +1405,216 @@
     el.dayModalFooter.classList.toggle('hidden', !html);
   }
 
-  /* ---------- Event form: pickers ---------- */
-  function renderTagPicker() {
-    if (!tags.length) {
-      el.tagPicker.innerHTML = `<p class="text-xs text-neutral-400">No tags yet. Click "Manage tags".</p>`;
-      return;
+  /* ---------- Photo 1:1 Cropper State (Event Modal & Day Modal) ---------- */
+  let cropImageObj = null;
+  let cropZoom = 1;
+  let cropX = 0;
+  let cropY = 0;
+  let isDraggingCrop = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let initialCropX = 0;
+  let initialCropY = 0;
+
+  // Detail inline cropper state
+  let detailCroppingEvId = null;
+  let detailCropImageObj = null;
+  let detailCropZoom = 1;
+  let detailCropX = 0;
+  let detailCropY = 0;
+  let isDraggingDetailCrop = false;
+  let detailDragStartX = 0;
+  let detailDragStartY = 0;
+  let initialDetailCropX = 0;
+  let initialDetailCropY = 0;
+
+  function updateDetailCropperTransform() {
+    const viewport = $('detailCropViewport');
+    const preview = $('detailCropPreview');
+    if (!detailCropImageObj || !viewport || !preview) return;
+
+    const V = viewport.clientWidth || 190;
+    const imgW = detailCropImageObj.naturalWidth || 1;
+    const imgH = detailCropImageObj.naturalHeight || 1;
+
+    let baseW, baseH;
+    if (imgW >= imgH) {
+      baseH = V;
+      baseW = V * (imgW / imgH);
+    } else {
+      baseW = V;
+      baseH = V * (imgH / imgW);
     }
-    el.tagPicker.innerHTML = tags.map((t) => {
-      const on = formTags.includes(t.id);
-      return `<button type="button" data-tag-toggle="${t.id}" ${on ? 'data-af' : ''}
-        class="rounded-full border px-3 py-1 text-xs font-semibold transition ${on
-          ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
-          : 'border-neutral-300 text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300'}">
-        ${escapeHtml(t.name)}</button>`;
-    }).join('');
+
+    const currentW = baseW * detailCropZoom;
+    const currentH = baseH * detailCropZoom;
+    const maxPanX = Math.max(0, (currentW - V) / 2);
+    const maxPanY = Math.max(0, (currentH - V) / 2);
+
+    detailCropX = Math.max(-maxPanX, Math.min(maxPanX, detailCropX));
+    detailCropY = Math.max(-maxPanY, Math.min(maxPanY, detailCropY));
+
+    preview.style.width = `${currentW}px`;
+    preview.style.height = `${currentH}px`;
+    preview.style.transform = `translate(calc(-50% + ${detailCropX}px), calc(-50% + ${detailCropY}px))`;
   }
 
-  function renderTimelineEditor() {
-    if (!formTimeline.length) {
-      el.timelineEditor.innerHTML = `<p class="text-xs text-neutral-400">No items yet. Add activity steps with their times.</p>`;
+  function exportDetailCroppedSquarePhoto(targetSize = 800, quality = 0.6) {
+    const viewport = $('detailCropViewport');
+    if (!detailCropImageObj || !viewport) return null;
+
+    const V = viewport.clientWidth || 190;
+    const imgW = detailCropImageObj.naturalWidth || 1;
+    const imgH = detailCropImageObj.naturalHeight || 1;
+
+    let baseW, baseH;
+    if (imgW >= imgH) {
+      baseH = V;
+      baseW = V * (imgW / imgH);
+    } else {
+      baseW = V;
+      baseH = V * (imgH / imgW);
+    }
+
+    const currentW = baseW * detailCropZoom;
+    const currentH = baseH * detailCropZoom;
+
+    const scaleX = imgW / currentW;
+    const scaleY = imgH / currentH;
+
+    const srcW = V * scaleX;
+    const srcH = V * scaleY;
+    const srcX = Math.max(0, Math.min(imgW - srcW, (currentW / 2 - detailCropX - V / 2) * scaleX));
+    const srcY = Math.max(0, Math.min(imgH - srcH, (currentH / 2 - detailCropY - V / 2) * scaleY));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetSize;
+    canvas.height = targetSize;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    ctx.drawImage(detailCropImageObj, srcX, srcY, srcW, srcH, 0, 0, targetSize, targetSize);
+    return canvas.toDataURL('image/jpeg', quality);
+  }
+
+  function loadPhotoForCropping(src) {
+    if (!src) {
+      cropImageObj = null;
+      formPhoto = null;
+      renderPhotoForm();
       return;
     }
-    el.timelineEditor.innerHTML = formTimeline.map((it, i) => `
-      <div class="tl-row rounded-lg border border-neutral-200 p-2 dark:border-neutral-700" data-index="${i}">
-        <div class="flex items-center gap-2">
-          <button type="button" data-tl-drag draggable="true" title="Drag to reorder"
-            class="flex h-8 w-5 flex-shrink-0 cursor-grab items-center justify-center text-neutral-400 transition hover:text-neutral-700 active:cursor-grabbing dark:hover:text-neutral-200">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>
-          </button>
-          <input type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" value="${escapeHtml(it.time || '')}" data-tl-field="time"
-            class="w-[4.5rem] flex-shrink-0 rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-center text-sm tabular-nums outline-none transition focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white" />
-          <input type="text" value="${escapeHtml(it.title || '')}" data-tl-field="title" placeholder="Activity" maxlength="80"
-            class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:focus:border-white" />
-          <button type="button" data-tl-remove="${i}" title="Remove item"
-            class="flex-shrink-0 rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
-          </button>
-        </div>
-        <div class="mt-2 flex items-center gap-2">
-          <button type="button" data-tl-loc="${i}"
-            class="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-dashed border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-500 transition hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800">
-            <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21c-4-4-7-7.5-7-10.5a7 7 0 0 1 14 0c0 3-3 6.5-7 10.5z"/><circle cx="12" cy="10" r="2.5"/></svg>
-            <span class="truncate">${it.location ? escapeHtml(it.location.name) : 'Add location (optional)'}</span>
-          </button>
-          ${it.location ? `<button type="button" data-tl-loc-clear="${i}" title="Remove location"
-            class="flex-shrink-0 rounded-lg p-1 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white">
-            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
-          </button>` : ''}
-        </div>
-      </div>`).join('');
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      cropImageObj = img;
+      formPhoto = src;
+      cropZoom = 1;
+      cropX = 0;
+      cropY = 0;
+      if (el.photoZoomSlider) el.photoZoomSlider.value = '1';
+      if (el.eventPhotoPreview) {
+        el.eventPhotoPreview.src = src;
+      }
+      renderPhotoForm();
+      setTimeout(updateCropperTransform, 30);
+    };
+    img.onerror = () => {
+      cropImageObj = null;
+      formPhoto = null;
+      renderPhotoForm();
+    };
+    img.src = src;
   }
-  function addTimelineRow() {
-    formTimeline.push({ time: '', title: '', location: null });
-    renderTimelineEditor();
-    const rows = el.timelineEditor.querySelectorAll('.tl-row');
-    const last = rows[rows.length - 1];
-    if (last) last.querySelector('[data-tl-field="time"]').focus();
+
+  function getCropperMetrics() {
+    if (!cropImageObj || !el.photoCropViewport) return null;
+    const V = el.photoCropViewport.clientWidth || 260;
+    const imgW = cropImageObj.naturalWidth || 1;
+    const imgH = cropImageObj.naturalHeight || 1;
+
+    let baseW, baseH;
+    if (imgW >= imgH) {
+      baseH = V;
+      baseW = V * (imgW / imgH);
+    } else {
+      baseW = V;
+      baseH = V * (imgH / imgW);
+    }
+
+    const currentW = baseW * cropZoom;
+    const currentH = baseH * cropZoom;
+    const maxPanX = Math.max(0, (currentW - V) / 2);
+    const maxPanY = Math.max(0, (currentH - V) / 2);
+
+    return { V, imgW, imgH, baseW, baseH, currentW, currentH, maxPanX, maxPanY };
   }
-  function removeTimelineRow(i) {
-    formTimeline.splice(i, 1);
-    renderTimelineEditor();
+
+  function updateCropperTransform() {
+    const m = getCropperMetrics();
+    if (!m || !el.eventPhotoPreview) return;
+
+    cropX = Math.max(-m.maxPanX, Math.min(m.maxPanX, cropX));
+    cropY = Math.max(-m.maxPanY, Math.min(m.maxPanY, cropY));
+
+    el.eventPhotoPreview.style.width = `${m.currentW}px`;
+    el.eventPhotoPreview.style.height = `${m.currentH}px`;
+    el.eventPhotoPreview.style.transform = `translate(calc(-50% + ${cropX}px), calc(-50% + ${cropY}px))`;
+
+    if (el.photoResetBtn) {
+      const isModified = cropZoom > 1 || Math.abs(cropX) > 1 || Math.abs(cropY) > 1;
+      el.photoResetBtn.classList.toggle('hidden', !isModified);
+    }
+  }
+
+  function exportCroppedSquarePhoto(targetSize = 800, quality = 0.6) {
+    if (!cropImageObj) return formPhoto;
+    const m = getCropperMetrics();
+    if (!m) return formPhoto;
+
+    const scaleX = m.imgW / m.currentW;
+    const scaleY = m.imgH / m.currentH;
+
+    const srcW = m.V * scaleX;
+    const srcH = m.V * scaleY;
+    const srcX = Math.max(0, Math.min(m.imgW - srcW, (m.currentW / 2 - cropX - m.V / 2) * scaleX));
+    const srcY = Math.max(0, Math.min(m.imgH - srcH, (m.currentH / 2 - cropY - m.V / 2) * scaleY));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetSize;
+    canvas.height = targetSize;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    ctx.drawImage(
+      cropImageObj,
+      srcX, srcY, srcW, srcH,
+      0, 0, targetSize, targetSize
+    );
+
+    return canvas.toDataURL('image/jpeg', quality);
+  }
+
+  function renderPhotoForm() {
+    if (formPhoto) {
+      if (el.photoPreviewContainer) {
+        el.photoPreviewContainer.classList.remove('hidden');
+        el.photoPreviewContainer.classList.add('flex');
+      }
+      if (el.uploadPhotoBtn) el.uploadPhotoBtn.classList.add('hidden');
+    } else {
+      cropImageObj = null;
+      if (el.eventPhotoPreview) el.eventPhotoPreview.src = '';
+      if (el.photoPreviewContainer) {
+        el.photoPreviewContainer.classList.add('hidden');
+        el.photoPreviewContainer.classList.remove('flex');
+      }
+      if (el.uploadPhotoBtn) el.uploadPhotoBtn.classList.remove('hidden');
+      if (el.eventPhotoInput) el.eventPhotoInput.value = '';
+      if (el.photoResetBtn) el.photoResetBtn.classList.add('hidden');
+    }
   }
 
   /* ---------- Event form modal ---------- */
@@ -726,68 +1624,83 @@
       const ev = events.find((e) => e.id === eventId);
       if (!ev) return;
       el.eventModalTitle.textContent = 'Edit Event';
+      if (el.eventPhotoSection) el.eventPhotoSection.classList.remove('hidden');
       el.eventId.value = ev.id;
       el.eventTitle.value = ev.title;
       el.eventDate.value = ev.date;
       el.eventDesc.value = ev.desc || '';
-      formTags = (ev.tags || []).slice();
-      formTimeline = (ev.timeline || []).map((i) => ({ ...i }));
+      if (ev.photo) {
+        loadPhotoForCropping(ev.photo);
+      } else {
+        formPhoto = null;
+        cropImageObj = null;
+        renderPhotoForm();
+      }
     } else {
       el.eventModalTitle.textContent = 'Add Event';
+      if (el.eventPhotoSection) el.eventPhotoSection.classList.add('hidden');
       el.eventId.value = '';
       el.eventDate.value = selectedDate || todayKey();
-      formTags = [];
-      formTimeline = [];
+      formPhoto = null;
+      cropImageObj = null;
+      renderPhotoForm();
     }
-    renderTagPicker();
-    renderTimelineEditor();
+
+    const charCountEl = $('eventDescCharCount');
+    if (charCountEl) {
+      charCountEl.textContent = `${(el.eventDesc.value || '').length}/50`;
+    }
+
     openModal(el.eventModal);
-    setTimeout(() => el.eventTitle.focus(), 50);
+    setTimeout(() => {
+      el.eventTitle.focus();
+      updateCropperTransform();
+    }, 50);
   }
 
   function handleEventSubmit(e) {
     e.preventDefault();
 
-    const title = el.eventTitle.value.trim();
-    const date = el.eventDate.value;
-    if (!title || !date) return;
+    try {
+      const title = el.eventTitle.value.trim();
+      const date = el.eventDate.value;
+      if (!title || !date) return;
 
-    const id = el.eventId.value;
-    // one event per date
-    if (events.some((x) => x.date === date && x.id !== id)) { toast('This date already has an event'); return; }
+      const id = el.eventId.value;
+      // one event per date
+      if (events.some((x) => x.date === date && x.id !== id)) {
+        toast('This date already has an event');
+        return;
+      }
 
-    const desc = el.eventDesc.value.trim();
-    const timeline = formTimeline
-      .map((i) => ({ time: maskTime(i.time || ''), title: (i.title || '').trim(), location: i.location || null }))
-      .filter((i) => i.title || i.time);
-    // Times must be a full 24h HH:MM if provided.
-    if (timeline.some((i) => i.time && !isValidTime(i.time))) { toast('Use a full 24h time (HH:MM)'); return; }
-    // Timeline may be empty, but if used it needs at least 2 items.
-    if (timeline.length === 1) { toast('Timeline needs at least 2 items (or leave empty)'); return; }
-    const payload = {
-      title, date, desc,
-      tags: formTags.slice(),
-      timeline,
-    };
+      const desc = el.eventDesc.value.trim().slice(0, 50);
+      const finalPhoto = cropImageObj ? exportCroppedSquarePhoto() : formPhoto;
+      const payload = {
+        title, date, desc,
+        photo: finalPhoto || null,
+      };
 
-    if (id) {
-      const ev = events.find((x) => x.id === id);
-      if (ev) { Object.assign(ev, payload); toast('Event updated'); }
-    } else {
-      events.push({ id: uid(), owner: 'U', ...payload });
-      toast('Event added');
+      if (id) {
+        const ev = events.find((x) => x.id === id);
+        if (ev) { Object.assign(ev, payload); }
+      } else {
+        events.push({ id: uid(), ...payload });
+      }
+
+      saveEvents();
+      closeModal(el.eventModal);
+
+      selectedDate = date;
+      const d = parseKey(date);
+      viewYear = d.getFullYear();
+      viewMonth = d.getMonth();
+      renderAll();
+
+      openDay(date);
+    } catch (err) {
+      console.error('Error saving event:', err);
+      toast('Failed to save event');
     }
-
-    saveEvents();
-    closeModal(el.eventModal);
-
-    selectedDate = date;
-    const d = parseKey(date);
-    viewYear = d.getFullYear();
-    viewMonth = d.getMonth();
-    renderAll();
-
-    if (!el.dayModal.classList.contains('hidden')) openDay(date);
   }
 
   function deleteEvent(id) {
@@ -797,148 +1710,26 @@
     events = events.filter((x) => x.id !== id);
     saveEvents();
     renderAll();
-    if (!el.dayModal.classList.contains('hidden')) renderDay();
-    toast('Event deleted');
+    if (!el.dayModal.classList.contains('hidden')) {
+      closeModal(el.dayModal);
+    }
   }
 
-  /* ---------- Tag manager ---------- */
-  function openTagModal() {
-    el.newTagName.value = '';
-    renderTagManager();
-    openModal(el.tagModal);
-  }
-  function renderTagManager() {
-    // Only custom tags are managed here; the built-in Movie/Food/Sport are fixed.
-    const custom = tags.filter((t) => !DEFAULT_TAG_IDS.has(t.id));
-    el.tagManagerList.innerHTML = custom.length
-      ? custom.map((t) => `
-        <span class="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 py-1 pl-3 pr-1.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200">
-          ${escapeHtml(t.name)}
-          <button type="button" data-tag-del="${t.id}" title="Remove tag"
-            class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-neutral-400 transition hover:bg-neutral-200 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-white">
-            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
-        </span>`).join('')
-      : `<p class="w-full text-sm text-neutral-400"></p>`;
-  }
-  function addTag() {
-    const name = el.newTagName.value.trim();
-    if (!name) return;
-    tags.push({ id: uid(), name, kuliner: false, movie: false });
-    saveTags();
-    el.newTagName.value = '';
-    renderTagManager();
-    el.newTagName.focus();
-  }
 
-  /* ---------- Peta (Leaflet) ---------- */
-  function fixLeafletIcons() {
-    delete L.Icon.Default.prototype._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-    });
-  }
-  function ensureMap() {
-    if (leafletMap) return;
-    fixLeafletIcons();
-    leafletMap = L.map('mapContainer').setView([HOME.lat, HOME.lng], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, attribution: '&copy; OpenStreetMap',
-    }).addTo(leafletMap);
-    leafletMap.on('click', (e) => setMapPoint(e.latlng.lat, e.latlng.lng));
-  }
-  function setMapPoint(lat, lng, name) {
-    mapTempLocation = { lat, lng, name: name || null };
-    if (!leafletMarker) leafletMarker = L.marker([lat, lng]).addTo(leafletMap);
-    else leafletMarker.setLatLng([lat, lng]);
-    updateMapInfo();
-    if (!name) reverseGeocode(lat, lng);
-  }
-  function updateMapInfo() {
-    if (!mapTempLocation) {
-      el.mapSelInfo.textContent = 'Click on the map or search to pick a location.';
-      return;
-    }
-    const dist = haversineKm(HOME, mapTempLocation).toFixed(1);
-    el.mapSelInfo.textContent = `${mapTempLocation.name || 'Loading location name…'} · ~${dist} km from ${HOME.name}`;
-  }
-  async function reverseGeocode(lat, lng) {
-    try {
-      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
-        { headers: { Accept: 'application/json' } });
-      const j = await r.json();
-      if (mapTempLocation && mapTempLocation.lat === lat && mapTempLocation.lng === lng) {
-        mapTempLocation.name = j.display_name
-          ? j.display_name.split(',').slice(0, 2).join(',').trim()
-          : `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
-        updateMapInfo();
-      }
-    } catch {
-      if (mapTempLocation) { mapTempLocation.name = `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`; updateMapInfo(); }
-    }
-  }
-  async function searchPlace(q) {
-    if (!q.trim()) return;
-    el.mapSearchBtn.disabled = true;
-    el.mapSearchBtn.textContent = '…';
-    /* label restored in finally */
-    try {
-      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`,
-        { headers: { Accept: 'application/json' } });
-      const j = await r.json();
-      if (j && j[0]) {
-        const lat = parseFloat(j[0].lat), lng = parseFloat(j[0].lon);
-        const name = j[0].display_name ? j[0].display_name.split(',').slice(0, 2).join(',').trim() : q;
-        leafletMap.setView([lat, lng], 15);
-        setMapPoint(lat, lng, name);
-      } else {
-        toast('Location not found');
-      }
-    } catch {
-      toast('Search failed');
-    } finally {
-      el.mapSearchBtn.disabled = false;
-      el.mapSearchBtn.textContent = 'Search';
-    }
-  }
-  function openMapModal(target) {
-    mapTarget = target;
-    const existing = formTimeline[mapTarget.index] && formTimeline[mapTarget.index].location;
-    mapTempLocation = existing ? { ...existing } : null;
-    el.mapSearch.value = '';
-    openModal(el.mapModal);
-    setTimeout(() => {
-      ensureMap();
-      leafletMap.invalidateSize();
-      if (mapTempLocation) {
-        if (!leafletMarker) leafletMarker = L.marker([mapTempLocation.lat, mapTempLocation.lng]).addTo(leafletMap);
-        else leafletMarker.setLatLng([mapTempLocation.lat, mapTempLocation.lng]);
-        leafletMap.setView([mapTempLocation.lat, mapTempLocation.lng], 14);
-      } else {
-        if (leafletMarker) { leafletMap.removeLayer(leafletMarker); leafletMarker = null; }
-        leafletMap.setView([HOME.lat, HOME.lng], 12);
-      }
-      updateMapInfo();
-    }, 80);
-  }
-  function applyMapLocation() {
-    if (!mapTempLocation) { toast('No location selected'); return; }
-    const loc = {
-      name: mapTempLocation.name || `Location (${mapTempLocation.lat.toFixed(4)}, ${mapTempLocation.lng.toFixed(4)})`,
-      lat: mapTempLocation.lat,
-      lng: mapTempLocation.lng,
-    };
-    if (formTimeline[mapTarget.index]) {
-      formTimeline[mapTarget.index].location = loc;
-      renderTimelineEditor();
-    }
-    closeModal(el.mapModal);
-  }
+
+
 
   /* ---------- Toast ---------- */
   function toast(message) {
+    if (!el.toastContainer) {
+      el.toastContainer = $('toastContainer');
+      if (!el.toastContainer) {
+        el.toastContainer = document.createElement('div');
+        el.toastContainer.id = 'toastContainer';
+        el.toastContainer.className = 'pointer-events-none fixed bottom-5 left-1/2 z-[60] flex -translate-x-1/2 flex-col items-center gap-2';
+        document.body.appendChild(el.toastContainer);
+      }
+    }
     const t = document.createElement('div');
     t.className = 'toast pointer-events-auto rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg dark:bg-white dark:text-neutral-900';
     t.dataset.af = '';
@@ -970,57 +1761,412 @@
 
   /* ---------- Event listeners ---------- */
   function bindEvents() {
-    el.themeToggleBtn.addEventListener('click', toggleTheme);
+    if (el.themeToggleBtn) el.themeToggleBtn.addEventListener('click', toggleTheme);
 
-    el.prevBtn.addEventListener('click', () => changeMonth(-1));
-    el.nextBtn.addEventListener('click', () => changeMonth(1));
-    el.todayBtn.addEventListener('click', goToday);
+    if (el.prevBtn) el.prevBtn.addEventListener('click', () => changeMonth(-1));
+    if (el.nextBtn) el.nextBtn.addEventListener('click', () => changeMonth(1));
+    if (el.todayBtn) el.todayBtn.addEventListener('click', goToday);
 
-    // tombol statis di dalam form / modal
-    el.manageTagsBtn.addEventListener('click', openTagModal);
-    el.addTimelineBtn.addEventListener('click', addTimelineRow);
-    el.addTagBtn.addEventListener('click', addTag);
-    el.newTagName.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } });
-    el.mapSearchBtn.addEventListener('click', () => searchPlace(el.mapSearch.value));
-    el.mapSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); searchPlace(el.mapSearch.value); } });
-    el.useLocationBtn.addEventListener('click', applyMapLocation);
-    el.openReceiptBtn.addEventListener('click', () => toast('Coming Soon :)'));
+    if (el.eventForm) el.eventForm.addEventListener('submit', handleEventSubmit);
 
-    // timeline reorder (drag the grip handle)
-    el.timelineEditor.addEventListener('dragstart', (e) => {
-      const h = e.target.closest('[data-tl-drag]');
-      if (!h) return;
-      const row = h.closest('.tl-row');
-      tlDragFrom = Number(row.dataset.index);
-      e.dataTransfer.effectAllowed = 'move';
-      try { e.dataTransfer.setData('text/plain', String(tlDragFrom)); } catch {}
-      row.classList.add('opacity-40');
-    });
-    el.timelineEditor.addEventListener('dragover', (e) => { if (tlDragFrom !== null) e.preventDefault(); });
-    el.timelineEditor.addEventListener('drop', (e) => {
-      if (tlDragFrom === null) return;
-      e.preventDefault();
-      const row = e.target.closest('.tl-row');
-      const item = formTimeline.splice(tlDragFrom, 1)[0];
-      let insertAt;
-      if (!row) {
-        insertAt = formTimeline.length;
-      } else {
-        const t = Number(row.dataset.index);
-        insertAt = tlDragFrom < t ? t - 1 : t;
+    // Movie controls & modal listeners
+    if (el.openAddMovieBtn) el.openAddMovieBtn.addEventListener('click', openAddMovie);
+    if (el.openMovieSearchBtn) el.openMovieSearchBtn.addEventListener('click', () => toggleWatchedMovieSearch());
+    if (el.watchedMovieSearchInput) {
+      el.watchedMovieSearchInput.addEventListener('input', (e) => {
+        watchedMovieQuery = (e.target.value || '').trim().toLowerCase();
+        if (el.clearWatchedSearchBtn) el.clearWatchedSearchBtn.classList.toggle('hidden', !watchedMovieQuery);
+        moviesPage = 0;
+        renderMoviesGrid();
+      });
+      el.watchedMovieSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          toggleWatchedMovieSearch(false);
+        }
+      });
+    }
+    if (el.clearWatchedSearchBtn) {
+      el.clearWatchedSearchBtn.addEventListener('click', () => {
+        watchedMovieQuery = '';
+        if (el.watchedMovieSearchInput) {
+          el.watchedMovieSearchInput.value = '';
+          el.watchedMovieSearchInput.focus();
+        }
+        el.clearWatchedSearchBtn.classList.add('hidden');
+        moviesPage = 0;
+        renderMoviesGrid();
+      });
+    }
+
+    if (el.addMovieForm) el.addMovieForm.addEventListener('submit', handleAddMovieSubmit);
+    if (el.clearSelectedMovieBtn) el.clearSelectedMovieBtn.addEventListener('click', clearSelectedMovie);
+
+    // Select movie from search results
+    if (el.movieSearchResults) {
+      el.movieSearchResults.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-select-movie]');
+        if (!btn) return;
+        try {
+          const data = JSON.parse(btn.dataset.selectMovie);
+          selectMovie(data);
+        } catch (err) {
+          console.error('Error selecting movie:', err);
+        }
+      });
+    }
+
+    // Movie grid card clicks and hover title marquee
+    if (el.moviesGrid) {
+      el.moviesGrid.addEventListener('click', (e) => {
+        const card = e.target.closest('[data-open-movie-id]');
+        if (card && card.dataset.openMovieId) {
+          openMovieDetail(card.dataset.openMovieId);
+        }
+      });
+
+      el.moviesGrid.addEventListener('mouseenter', (e) => {
+        const card = e.target.closest('[data-open-movie-id]');
+        if (!card) return;
+        const line2 = card.querySelector('.movie-title-line2');
+        const span = line2 ? line2.querySelector('.movie-line2-span') : null;
+        if (line2 && span && span.dataset.full) {
+          span.textContent = span.dataset.full;
+          const diff = span.scrollWidth - line2.clientWidth;
+          if (diff > 2) {
+            span.style.setProperty('--scroll-dist', `-${diff}px`);
+            span.classList.add('animate-marquee');
+          }
+        }
+      }, true);
+
+      el.moviesGrid.addEventListener('mouseleave', (e) => {
+        const card = e.target.closest('[data-open-movie-id]');
+        if (!card) return;
+        const span = card.querySelector('.movie-line2-span');
+        if (span) {
+          span.classList.remove('animate-marquee');
+          span.style.removeProperty('--scroll-dist');
+          if (span.dataset.short) {
+            span.textContent = span.dataset.short;
+          }
+        }
+      }, true);
+    }
+
+    // Movie Detail Modal rating listeners
+    if (el.editMovieRatingBtn) {
+      el.editMovieRatingBtn.addEventListener('click', () => {
+        const movie = movies.find((m) => m.id === activeDetailMovieId);
+        const currentRate = (movie && movie.rating && parseFloat(movie.rating) > 0) ? parseFloat(movie.rating) : 0;
+        if (el.movieRatingSlider) el.movieRatingSlider.value = currentRate;
+        setRatingEditMode(true);
+      });
+    }
+    if (el.closeRatingEditBtn) {
+      el.closeRatingEditBtn.addEventListener('click', () => {
+        const movie = movies.find((m) => m.id === activeDetailMovieId);
+        if (movie) {
+          const savedRate = (movie.rating && parseFloat(movie.rating) > 0) ? parseFloat(movie.rating) : 0;
+          if (el.movieRatingSlider) el.movieRatingSlider.value = savedRate;
+          if (el.detailRatingInput) el.detailRatingInput.value = movie.rating || '';
+        }
+        setRatingEditMode(false);
+      });
+    }
+    if (el.movieRatingSlider) {
+      el.movieRatingSlider.addEventListener('input', updateRatingSliderBubble);
+    }
+
+    // Movie Ticket Photo handlers
+    if (el.movieTicketBox) {
+      el.movieTicketBox.addEventListener('click', () => {
+        if (isMovieDetailEditing || !activeTicketPhoto) {
+          if (el.movieTicketInput) el.movieTicketInput.click();
+        } else {
+          if (el.lightboxImage) el.lightboxImage.src = activeTicketPhoto;
+          if (el.imageLightboxModal) openModal(el.imageLightboxModal);
+        }
+      });
+    }
+    if (el.movieTicketInput) {
+      el.movieTicketInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+          toast('Please select an image file for the ticket');
+          return;
+        }
+        try {
+          const compressed = await compressImage(file, 800, 0.5);
+          activeTicketPhoto = compressed;
+          renderTicketPreview(activeTicketPhoto);
+          if (el.saveMovieRatingBtn) el.saveMovieRatingBtn.classList.remove('hidden');
+        } catch (err) {
+          console.error('Error processing ticket photo:', err);
+          toast('Failed to process ticket photo');
+        }
+      });
+    }
+    if (el.saveMovieRatingBtn) el.saveMovieRatingBtn.addEventListener('click', handleSaveMovieRating);
+    if (el.deleteMovieBtn) el.deleteMovieBtn.addEventListener('click', handleDeleteMovie);
+    if (el.movieSearchBtn) el.movieSearchBtn.addEventListener('click', () => searchMovies(el.movieSearchInput ? el.movieSearchInput.value : ''));
+    if (el.movieSearchInput) {
+      el.movieSearchInput.addEventListener('input', (e) => {
+        clearTimeout(searchDebounceTimer);
+        const val = e.target.value;
+        if (!val.trim()) {
+          if (el.movieSearchResults) el.movieSearchResults.classList.add('hidden');
+          return;
+        }
+        searchDebounceTimer = setTimeout(() => searchMovies(val), 350);
+      });
+      el.movieSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          clearTimeout(searchDebounceTimer);
+          searchMovies(e.target.value);
+        }
+      });
+    }
+
+    if (el.eventDesc) {
+      el.eventDesc.addEventListener('input', () => {
+        const count = (el.eventDesc.value || '').length;
+        const counter = $('eventDescCharCount');
+        if (counter) counter.textContent = `${count}/50`;
+      });
+    }
+
+    if (el.uploadPhotoBtn) el.uploadPhotoBtn.addEventListener('click', () => el.eventPhotoInput.click());
+    if (el.eventPhotoInput) el.eventPhotoInput.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        toast('Please select an image file');
+        return;
       }
-      formTimeline.splice(insertAt, 0, item);
-      tlDragFrom = null;
-      renderTimelineEditor();
+      try {
+        const compressed = await compressImage(file, 1600, 0.9);
+        loadPhotoForCropping(compressed);
+      } catch {
+        toast('Failed to process image');
+      }
     });
-    el.timelineEditor.addEventListener('dragend', () => {
-      if (tlDragFrom !== null) { tlDragFrom = null; renderTimelineEditor(); }
+    if (el.removePhotoBtn) el.removePhotoBtn.addEventListener('click', () => {
+      formPhoto = null;
+      cropImageObj = null;
+      renderPhotoForm();
     });
 
-    el.eventForm.addEventListener('submit', handleEventSubmit);
+    // Photo Cropper drag & zoom listeners
+    if (el.photoCropViewport) {
+      el.photoCropViewport.addEventListener('pointerdown', (e) => {
+        if (!cropImageObj || e.target.closest('#removePhotoBtn')) return;
+        isDraggingCrop = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        initialCropX = cropX;
+        initialCropY = cropY;
+        try { el.photoCropViewport.setPointerCapture(e.pointerId); } catch {}
+      });
+
+      el.photoCropViewport.addEventListener('pointermove', (e) => {
+        if (!isDraggingCrop) return;
+        cropX = initialCropX + (e.clientX - dragStartX);
+        cropY = initialCropY + (e.clientY - dragStartY);
+        updateCropperTransform();
+      });
+
+      const stopDrag = (e) => {
+        if (isDraggingCrop) {
+          isDraggingCrop = false;
+          try { el.photoCropViewport.releasePointerCapture(e.pointerId); } catch {}
+        }
+      };
+      el.photoCropViewport.addEventListener('pointerup', stopDrag);
+      el.photoCropViewport.addEventListener('pointercancel', stopDrag);
+
+      // Mouse wheel zoom
+      el.photoCropViewport.addEventListener('wheel', (e) => {
+        if (!cropImageObj) return;
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        cropZoom = Math.max(1, Math.min(3, cropZoom + delta));
+        if (el.photoZoomSlider) el.photoZoomSlider.value = String(cropZoom);
+        updateCropperTransform();
+      }, { passive: false });
+    }
+
+    if (el.photoZoomSlider) {
+      el.photoZoomSlider.addEventListener('input', () => {
+        cropZoom = parseFloat(el.photoZoomSlider.value) || 1;
+        updateCropperTransform();
+      });
+    }
+
+    if (el.photoResetBtn) {
+      el.photoResetBtn.addEventListener('click', () => {
+        cropZoom = 1;
+        cropX = 0;
+        cropY = 0;
+        if (el.photoZoomSlider) el.photoZoomSlider.value = '1';
+        updateCropperTransform();
+      });
+    }
+
+    if (el.detailPhotoInput) {
+      el.detailPhotoInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+          toast('Please select an image file');
+          return;
+        }
+        try {
+          const compressed = await compressImage(file, 1600, 0.9);
+          if (detailUploadTargetId) {
+            const ev = events.find((x) => x.id === detailUploadTargetId);
+            if (ev) {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.onload = () => {
+                detailCroppingEvId = ev.id;
+                detailCropImageObj = img;
+                detailCropZoom = 1;
+                detailCropX = 0;
+                detailCropY = 0;
+                renderDayBody(ev);
+                setTimeout(updateDetailCropperTransform, 30);
+              };
+              img.src = compressed;
+            }
+          }
+        } catch {
+          toast('Failed to process image');
+        }
+      });
+    }
+
+    // Detail inline cropper drag and zoom listeners
+    document.addEventListener('pointerdown', (e) => {
+      const viewport = e.target.closest('#detailCropViewport');
+      if (viewport && detailCropImageObj) {
+        isDraggingDetailCrop = true;
+        detailDragStartX = e.clientX;
+        detailDragStartY = e.clientY;
+        initialDetailCropX = detailCropX;
+        initialDetailCropY = detailCropY;
+        try { viewport.setPointerCapture(e.pointerId); } catch {}
+      }
+    });
+
+    document.addEventListener('pointermove', (e) => {
+      if (!isDraggingDetailCrop) return;
+      detailCropX = initialDetailCropX + (e.clientX - detailDragStartX);
+      detailCropY = initialDetailCropY + (e.clientY - detailDragStartY);
+      updateDetailCropperTransform();
+    });
+
+    const stopDetailDrag = (e) => {
+      if (isDraggingDetailCrop) {
+        isDraggingDetailCrop = false;
+        const viewport = $('detailCropViewport');
+        if (viewport) {
+          try { viewport.releasePointerCapture(e.pointerId); } catch {}
+        }
+      }
+    };
+    document.addEventListener('pointerup', stopDetailDrag);
+    document.addEventListener('pointercancel', stopDetailDrag);
+
+    document.addEventListener('wheel', (e) => {
+      if (!detailCropImageObj) return;
+      const viewport = e.target.closest('#detailCropViewport');
+      if (viewport) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        detailCropZoom = Math.max(1, Math.min(3, detailCropZoom + delta));
+        const slider = $('detailZoomSlider');
+        if (slider) slider.value = String(detailCropZoom);
+        updateDetailCropperTransform();
+      }
+    }, { passive: false });
+
+    document.addEventListener('input', (e) => {
+      if (e.target && e.target.id === 'detailZoomSlider') {
+        detailCropZoom = parseFloat(e.target.value) || 1;
+        updateDetailCropperTransform();
+      }
+    });
 
     // klik global (delegation)
     document.addEventListener('click', (e) => {
+      const moviePrev = e.target.closest('[data-movie-prev]');
+      if (moviePrev) {
+        if (moviesPage > 0) {
+          moviesPage--;
+          renderMoviesGrid();
+        }
+        return;
+      }
+      const movieNext = e.target.closest('[data-movie-next]');
+      if (movieNext) {
+        const perPage = getMoviesPerPage();
+        const totalPages = Math.ceil(movies.length / perPage);
+        if (moviesPage < totalPages - 1) {
+          moviesPage++;
+          renderMoviesGrid();
+        }
+        return;
+      }
+
+      const navViewBtn = e.target.closest('[data-nav-view]');
+      if (navViewBtn) {
+        switchView(navViewBtn.dataset.navView);
+        return;
+      }
+
+      const flipContainer = e.target.closest('[data-flip-photo]');
+      if (flipContainer) {
+        flipContainer.classList.toggle('is-flipped');
+        return;
+      }
+
+      const detailCancelBtn = e.target.closest('#detailCancelCropBtn');
+      if (detailCancelBtn) {
+        detailCroppingEvId = null;
+        detailCropImageObj = null;
+        const ev = eventForDate(selectedDate);
+        if (ev) renderDayBody(ev);
+        return;
+      }
+
+      const detailSaveBtn = e.target.closest('#detailSaveCropBtn');
+      if (detailSaveBtn) {
+        const ev = eventForDate(selectedDate);
+        if (ev && detailCropImageObj) {
+          const cropped = exportDetailCroppedSquarePhoto();
+          if (cropped) {
+            ev.photo = cropped;
+            saveEvents();
+            detailCroppingEvId = null;
+            detailCropImageObj = null;
+            renderDay();
+          }
+        }
+        return;
+      }
+
+      const detailUpBtn = e.target.closest('[data-detail-upload]');
+      if (detailUpBtn) {
+        detailUploadTargetId = detailUpBtn.dataset.detailUpload;
+        if (el.detailPhotoInput) {
+          el.detailPhotoInput.value = '';
+          el.detailPhotoInput.click();
+        }
+        return;
+      }
+
       const dayBtn = e.target.closest('[data-day]');
       if (dayBtn) { openDay(dayBtn.dataset.day); return; }
 
@@ -1030,60 +2176,23 @@
       const delBtn = e.target.closest('[data-delete]');
       if (delBtn) { deleteEvent(delBtn.dataset.delete); return; }
 
-      // statistik (expand mengubah ruang → hitung ulang paginasi)
-      if (e.target.closest('#statsToggleBtn')) { statsExpanded = !statsExpanded; renderStats(); renderUpcoming(); return; }
+
 
       // paginasi kegiatan mendatang
       if (e.target.closest('[data-up-prev]')) { if (upcomingPage > 0) { upcomingPage--; renderUpcoming(); } return; }
       if (e.target.closest('[data-up-next]')) { upcomingPage++; renderUpcoming(); return; }
 
+      // kategori khusus (Movies / Food)
+      const catBtn = e.target.closest('[data-category-page]');
+      if (catBtn) { openCategoryPage(catBtn.dataset.categoryPage); return; }
+
       // day modal footer
       if (e.target.closest('#addEventBtn')) { openEventForm(null); return; }
-
-      // tag picker (form)
-      const tg = e.target.closest('[data-tag-toggle]');
-      if (tg) {
-        const id = tg.dataset.tagToggle;
-        const idx = formTags.indexOf(id);
-        if (idx >= 0) formTags.splice(idx, 1); else formTags.push(id);
-        renderTagPicker();
-        return;
-      }
-
-      // timeline
-      const tlDel = e.target.closest('[data-tl-remove]');
-      if (tlDel) { removeTimelineRow(Number(tlDel.dataset.tlRemove)); return; }
-      const tlLocClear = e.target.closest('[data-tl-loc-clear]');
-      if (tlLocClear) { const i = Number(tlLocClear.dataset.tlLocClear); if (formTimeline[i]) { formTimeline[i].location = null; renderTimelineEditor(); } return; }
-      const tlLoc = e.target.closest('[data-tl-loc]');
-      if (tlLoc) { openMapModal({ type: 'timeline', index: Number(tlLoc.dataset.tlLoc) }); return; }
-
-      // tag manager — remove a custom tag (built-ins aren't listed here)
-      const tDel = e.target.closest('[data-tag-del]');
-      if (tDel) {
-        const id = tDel.dataset.tagDel;
-        if (!DEFAULT_TAG_IDS.has(id)) {
-          tags = tags.filter((t) => t.id !== id);
-          saveTags(); renderTagManager();
-        }
-        return;
-      }
 
       // tutup modal
       const closeBtn = e.target.closest('[data-close-modal]');
       if (closeBtn) { const m = closeBtn.closest('.modal-root'); if (m) closeModalSmart(m); return; }
       if (e.target.classList.contains('modal-backdrop')) { closeModalSmart(e.target.parentElement); return; }
-    });
-
-    // edit field timeline (tanpa re-render agar fokus tidak hilang)
-    document.addEventListener('input', (e) => {
-      const tlField = e.target.closest('[data-tl-field]');
-      if (tlField) {
-        const row = tlField.closest('.tl-row');
-        const i = Number(row.dataset.index);
-        if (tlField.dataset.tlField === 'time') tlField.value = maskTime(tlField.value);  // enforce 24h
-        if (formTimeline[i]) formTimeline[i][tlField.dataset.tlField] = tlField.value;
-      }
     });
 
     // ESC menutup modal teratas
@@ -1095,10 +2204,16 @@
     let resizeTimer;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(renderUpcoming, 150);
+      resizeTimer = setTimeout(() => {
+        renderUpcoming();
+        updateNavIndicator(currentView || 'calendar');
+      }, 150);
     });
     // setelah semua aset (Tailwind/font) selesai → ukuran final, hitung ulang
-    window.addEventListener('load', () => renderUpcoming());
+    window.addEventListener('load', () => {
+      renderUpcoming();
+      updateNavIndicator(currentView || 'calendar');
+    });
 
     // sinkron data bersama: segarkan saat tab difokuskan & berkala
     window.addEventListener('focus', maybePull);
@@ -1109,14 +2224,13 @@
   /* ---------- Init ---------- */
   function init() {
     loadEvents();
-    loadTags();
     initTheme();
     goToday();
     renderWeekdays();
     bindEvents();
     setInterval(tickCountdown, 1000);   // countdown bergerak tiap detik
-    // layout final (tinggi kalender) baru pasti setelah render pertama → hitung ulang paginasi
     setTimeout(renderUpcoming, 80);
+    setTimeout(() => updateNavIndicator(currentView || 'calendar'), 40);
     pullRemote();                        // ambil data terbaru dari DB (fallback ke cache bila offline)
   }
 

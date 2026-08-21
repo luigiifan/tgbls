@@ -74,7 +74,7 @@ module.exports = async (req, res) => {
 
   try {
     if (req.method === 'GET') {
-      const data = (await sbGet()) || { events: [], tags: [], updatedAt: 0 };
+      const data = (await sbGet()) || { events: [], tags: [], movies: [], updatedAt: 0 };
       return res.status(200).json(data);
     }
 
@@ -83,6 +83,7 @@ module.exports = async (req, res) => {
       const data = {
         events: Array.isArray(body.events) ? body.events : [],
         tags: Array.isArray(body.tags) ? body.tags : [],
+        movies: Array.isArray(body.movies) ? body.movies : [],
         updatedAt: Date.now(),
       };
       await sbUpsert(data);
