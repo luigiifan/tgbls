@@ -242,10 +242,6 @@
     linkedPhotoModal: $('linkedPhotoModal'),
     linkedPhotoTabs: $('linkedPhotoTabs'),
     linkedPhotoGrid: $('linkedPhotoGrid'),
-    // in-container photo sync overlays
-    eventPhotoSyncOverlay1: $('eventPhotoSyncOverlay1'),
-    eventPhotoSyncOverlay2: $('eventPhotoSyncOverlay2'),
-    movieTicketSyncOverlay: $('movieTicketSyncOverlay'),
     movieDateInputNative: $('movieDateInput_native'),
     movieDateInputPickerBtn: $('movieDateInput_pickerBtn'),
     toastContainer: $('toastContainer'),
@@ -501,36 +497,39 @@
     schedulePush();
   }
 
-  // In-Photo Sync Loading Indicators & State
+  // Circular Loading Spinner for Action Buttons
+  const SPINNER_SVG = `<svg class="h-4 w-4 animate-spin text-current inline-block mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+
+  function setButtonLoading(btn, loading, defaultText = 'Save') {
+    if (!btn) return;
+    btn.disabled = Boolean(loading);
+    if (loading) {
+      if (!btn.dataset.origText) {
+        btn.dataset.origText = btn.textContent.trim() || defaultText;
+      }
+      btn.innerHTML = SPINNER_SVG;
+      btn.classList.add('pointer-events-none');
+    } else {
+      btn.innerHTML = btn.dataset.origText || defaultText;
+      delete btn.dataset.origText;
+      btn.classList.remove('pointer-events-none');
+    }
+  }
+
   let isSyncingActive = false;
 
   function setEventPhotoSyncLoading(loading) {
     isSyncingActive = Boolean(loading);
-    if (el.eventPhotoSyncOverlay1) {
-      el.eventPhotoSyncOverlay1.classList.toggle('hidden', !loading);
-      el.eventPhotoSyncOverlay1.classList.toggle('flex', Boolean(loading));
-    }
-    if (el.eventPhotoSyncOverlay2) {
-      el.eventPhotoSyncOverlay2.classList.toggle('hidden', !loading);
-      el.eventPhotoSyncOverlay2.classList.toggle('flex', Boolean(loading));
-    }
     const saveBtn = el.eventModal ? el.eventModal.querySelector('button[type="submit"]') : null;
     if (saveBtn) {
-      saveBtn.disabled = Boolean(loading);
-      saveBtn.classList.toggle('opacity-50', Boolean(loading));
+      setButtonLoading(saveBtn, loading, 'Save');
     }
   }
 
   function setMovieTicketSyncLoading(loading) {
     isSyncingActive = Boolean(loading);
-    if (el.movieTicketSyncOverlay) {
-      el.movieTicketSyncOverlay.classList.toggle('hidden', !loading);
-      el.movieTicketSyncOverlay.classList.toggle('flex', Boolean(loading));
-    }
     if (el.saveMovieRatingBtn) {
-      el.saveMovieRatingBtn.disabled = Boolean(loading);
-      el.saveMovieRatingBtn.classList.toggle('opacity-50', Boolean(loading));
-      el.saveMovieRatingBtn.textContent = loading ? 'Saving...' : 'Save';
+      setButtonLoading(el.saveMovieRatingBtn, loading, 'Save');
     }
     if (el.movieShowTicketMobileBtn) {
       el.movieShowTicketMobileBtn.disabled = Boolean(loading);
@@ -539,16 +538,9 @@
 
   function setDetailCropSyncLoading(loading) {
     isSyncingActive = Boolean(loading);
-    const overlay = $('detailCropSyncOverlay');
-    if (overlay) {
-      overlay.classList.toggle('hidden', !loading);
-      overlay.classList.toggle('flex', Boolean(loading));
-    }
     const saveBtn = $('detailSaveCropBtn');
     if (saveBtn) {
-      saveBtn.disabled = Boolean(loading);
-      saveBtn.classList.toggle('opacity-50', Boolean(loading));
-      saveBtn.textContent = loading ? 'Saving...' : 'Save Photo';
+      setButtonLoading(saveBtn, loading, 'Save Photo');
     }
     const cancelBtn = $('detailCancelCropBtn');
     if (cancelBtn) {
@@ -754,8 +746,7 @@
 
     const submitBtn = el.loginForm ? el.loginForm.querySelector('button[type="submit"]') : null;
     if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Logging in...';
+      setButtonLoading(submitBtn, true, 'Log In');
     }
 
     try {
@@ -832,8 +823,7 @@
       }
     } finally {
       if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Log In';
+        setButtonLoading(submitBtn, false, 'Log In');
       }
     }
   }
@@ -2279,8 +2269,7 @@
 
     const userPayload = { id, username, pass, name, sex, theme, permissions };
     if (el.saveUserBtn) {
-      el.saveUserBtn.disabled = true;
-      el.saveUserBtn.textContent = 'Saving...';
+      setButtonLoading(el.saveUserBtn, true, 'Save User');
     }
 
     try {
@@ -2356,8 +2345,7 @@
       }
     } finally {
       if (el.saveUserBtn) {
-        el.saveUserBtn.disabled = false;
-        el.saveUserBtn.textContent = 'Save User';
+        setButtonLoading(el.saveUserBtn, false, 'Save User');
       }
     }
   }
@@ -2480,13 +2468,6 @@
             <img id="detailCropPreview" src="${detailCropImageObj.src}" alt="Photo preview"
               class="pointer-events-none absolute left-1/2 top-1/2 max-h-none max-w-none select-none" />
             <div class="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-black/10 dark:ring-white/10"></div>
-            <!-- In-Photo Sync Loading Overlay -->
-            <div id="detailCropSyncOverlay" class="hidden absolute inset-0 z-20 items-center justify-center rounded-2xl bg-neutral-950/60 backdrop-blur-xs animate-fade-in pointer-events-auto">
-              <svg class="h-8 w-8 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
-                <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-              </svg>
-            </div>
           </div>
 
           <!-- Zoom slider -->
