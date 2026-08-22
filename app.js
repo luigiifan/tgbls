@@ -148,6 +148,7 @@
     saveUserBtn: $('saveUserBtn'),
     deleteUserFromFormBtn: $('deleteUserFromFormBtn'),
     // movie controls & modal
+    moviesTitleBlock: $('moviesTitleBlock'),
     moviesHeaderSearchBlock: $('moviesHeaderSearchBlock'),
     moviesSelectControls: $('moviesSelectControls'),
     toggleMovieSelectBtn: $('toggleMovieSelectBtn'),
@@ -994,6 +995,10 @@
     }
     isWatchedSearchActive = (typeof forceOpen === 'boolean') ? forceOpen : !isWatchedSearchActive;
 
+    if (el.moviesTitleBlock) {
+      el.moviesTitleBlock.classList.toggle('hidden', isWatchedSearchActive);
+      el.moviesTitleBlock.classList.toggle('sm:block', isWatchedSearchActive);
+    }
     if (el.moviesHeaderSearchBlock) {
       el.moviesHeaderSearchBlock.classList.toggle('hidden', !isWatchedSearchActive);
       el.moviesHeaderSearchBlock.classList.toggle('flex', isWatchedSearchActive);
@@ -3789,6 +3794,22 @@
     window.addEventListener('load', () => {
       renderUpcoming();
       updateNavIndicator(currentView || 'calendar');
+    });
+
+    // Disable double-tap-to-zoom and gesture zooming on mobile browsers (Safari / Chrome)
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
+          e.preventDefault();
+        }
+      }
+      lastTouchEnd = now;
+    }, { passive: false });
+
+    document.addEventListener('gesturestart', (e) => {
+      e.preventDefault();
     });
 
     // sinkron data bersama: segarkan saat tab difokuskan & berkala

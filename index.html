@@ -2,7 +2,7 @@
 <html lang="en-GB" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>tigabelas</title>
   <meta name="description" content="Full-month activity calendar." />
 
@@ -173,8 +173,8 @@
         <div id="moviesCard" class="hidden h-full min-h-0 flex-col rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:p-6">
           <!-- Movies Header -->
           <div class="mb-5 flex items-center justify-between gap-3">
-            <!-- Title Block (Always Visible on Left) -->
-            <div class="min-w-0">
+            <!-- Title Block (Hidden on mobile during search) -->
+            <div id="moviesTitleBlock" class="min-w-0">
               <h2 class="text-xl font-bold tracking-tight sm:text-2xl">Movies in 2026</h2>
               <p id="moviesProgressSubtitle" class="mt-1.5 text-xs font-semibold tabular-nums text-neutral-500 dark:text-neutral-400">
                 Page 1
@@ -182,14 +182,15 @@
             </div>
 
             <!-- Header Controls & Pagination Area on Right -->
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 flex-1 sm:flex-initial justify-end">
               <!-- Inline Search Bar in Controls Area -->
-              <div id="moviesHeaderSearchBlock" class="hidden items-center animate-fade-in">
-                <div class="relative w-44 sm:w-60">
+              <div id="moviesHeaderSearchBlock" class="hidden items-center animate-fade-in flex-1 sm:flex-initial">
+                <div class="relative w-full sm:w-60">
                   <svg class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                   <input type="text" id="watchedMovieSearchInput"
+                    placeholder="Search movies..."
                     class="h-9 w-full rounded-xl border border-neutral-200 bg-neutral-50 py-1.5 pl-8 pr-7 text-xs transition focus:border-neutral-400 focus:bg-white focus:outline-none focus:ring-0 dark:border-neutral-800 dark:bg-neutral-800/50 dark:focus:border-neutral-700 dark:focus:bg-neutral-900" />
                   <button type="button" id="clearWatchedSearchBtn" title="Clear filter" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18" /></svg>
@@ -227,7 +228,7 @@
                 <button type="button" id="movieMobileSelectActionsBtn" title="Selection options"
                   class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
                   <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
                   </svg>
                 </button>
 
