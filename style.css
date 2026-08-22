@@ -89,6 +89,16 @@ input[type="date"]::-webkit-date-and-time-value {
   transition: filter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Profile Dropdown Open Blur Effect across all page containers */
+.is-profile-open main,
+.is-profile-open #headerBrand,
+.is-profile-open #navTabsContainer {
+  filter: blur(8px);
+  pointer-events: none;
+  user-select: none;
+  transition: filter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Running / Marquee text for long titles */
 @keyframes marquee-scroll {
   0%, 15% {

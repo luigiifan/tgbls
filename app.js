@@ -5,16 +5,63 @@
 (function () {
   'use strict';
 
-  /* ---------- Konstanta ---------- */
   const KEY_EVENTS = 'tigabelas.events.v1';
   const KEY_MOVIES = 'tigabelas.movies.v1';
   const KEY_THEME = 'tigabelas.theme';
   const KEY_AUTH_USER = 'tigabelas.currentUser';
+  const KEY_USERS = 'tigabelas.users.v1';
 
-  const TEST_USERS = [
-    { username: 'lgiifn', pass: '13052004', name: 'Luigi Ifan', sex: 'Him', theme: 'dark' },
-    { username: 'fany', pass: '13042003', name: 'Yousyta Fany', sex: 'Her', theme: 'pink' }
+  async function safeJson(response) {
+    if (!response) return null;
+    try {
+      const text = await response.text();
+      if (!text || !text.trim()) return null;
+      return JSON.parse(text);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  const DEFAULT_USERS = [
+    {
+      id: 'usr_lgiifn',
+      username: 'lgiifn',
+      pass: '13052004',
+      name: 'Luigi Ifan',
+      sex: 'Him',
+      theme: 'dark',
+      role: 'admin',
+      permissions: { canManageEvents: true, canManageMovies: true, canManageUsers: true },
+    },
+    {
+      id: 'usr_ysfany',
+      username: 'ysfany',
+      pass: '13042003',
+      name: 'Yousyta Fany',
+      sex: 'Her',
+      theme: 'pink',
+      role: 'admin',
+      permissions: { canManageEvents: true, canManageMovies: true, canManageUsers: true },
+    },
   ];
+
+  function getLocalUsers() {
+    try {
+      const raw = localStorage.getItem(KEY_USERS);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    try { localStorage.setItem(KEY_USERS, JSON.stringify(DEFAULT_USERS)); } catch (e) {}
+    return JSON.parse(JSON.stringify(DEFAULT_USERS));
+  }
+
+  function setLocalUsers(list) {
+    try {
+      localStorage.setItem(KEY_USERS, JSON.stringify(list));
+    } catch (e) {}
+  }
 
   const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -50,6 +97,7 @@
   const el = {
     profileBtn: $('profileBtn'),
     profileDropdown: $('profileDropdown'),
+    profileBackdrop: $('profileBackdrop'),
     profileOwnerName: $('profileOwnerName'),
     profileOwnerRole: $('profileOwnerRole'),
     openLoginModalBtn: $('openLoginModalBtn'),
@@ -72,7 +120,33 @@
     moviesGrid: $('moviesGrid'), moviesProgressSubtitle: $('moviesProgressSubtitle'),
     moviesPager: $('moviesPager'),
     sidebar: $('sidebar'),
-    openReceiptBtn: $('openReceiptBtn'),
+    openBookmarksBtn: $('openBookmarksBtn'),
+    bookmarksModal: $('bookmarksModal'),
+    bookmarksCountBadge: $('bookmarksCountBadge'),
+    bookmarksList: $('bookmarksList'),
+    // user settings & management
+    openSettingsModalBtn: $('openSettingsModalBtn'),
+    settingsModal: $('settingsModal'),
+    usersCountBadge: $('usersCountBadge'),
+    usersListContainer: $('usersListContainer'),
+    openAddUserBtn: $('openAddUserBtn'),
+    userFormModal: $('userFormModal'),
+    userFormModalTitle: $('userFormModalTitle'),
+    userForm: $('userForm'),
+    userFormId: $('userFormId'),
+    userFormUsername: $('userFormUsername'),
+    userFormPassword: $('userFormPassword'),
+    userFormPassReqStar: $('userFormPassReqStar'),
+    userFormPassHint: $('userFormPassHint'),
+    userFormName: $('userFormName'),
+    userFormSex: $('userFormSex'),
+    userFormTheme: $('userFormTheme'),
+    permEvents: $('permEvents'),
+    permMovies: $('permMovies'),
+    permUsers: $('permUsers'),
+    userFormErrorMsg: $('userFormErrorMsg'),
+    saveUserBtn: $('saveUserBtn'),
+    deleteUserFromFormBtn: $('deleteUserFromFormBtn'),
     // movie controls & modal
     moviesHeaderTitleBlock: $('moviesHeaderTitleBlock'),
     moviesHeaderSearchBlock: $('moviesHeaderSearchBlock'),
@@ -85,8 +159,16 @@
     clearWatchedSearchBtn: $('clearWatchedSearchBtn'),
     movieSearchIconSvg: $('movieSearchIconSvg'),
     movieSearchCloseSvg: $('movieSearchCloseSvg'),
+    moviesDesktopControls: $('moviesDesktopControls'),
     openAddMovieBtn: $('openAddMovieBtn'),
     openMovieSearchBtn: $('openMovieSearchBtn'),
+    movieMobileActionsWrap: $('movieMobileActionsWrap'),
+    movieMobileActionsBtn: $('movieMobileActionsBtn'),
+    movieMobileSearchCloseBtn: $('movieMobileSearchCloseBtn'),
+    movieMobileActionsMenu: $('movieMobileActionsMenu'),
+    mobileAddMovieBtn: $('mobileAddMovieBtn'),
+    mobileSearchMovieBtn: $('mobileSearchMovieBtn'),
+    mobileSelectMovieBtn: $('mobileSelectMovieBtn'),
     addMovieModal: $('addMovieModal'),
     addMovieForm: $('addMovieForm'),
     movieSearchBlock: $('movieSearchBlock'),
@@ -120,6 +202,8 @@
     movieTicketPreview: $('movieTicketPreview'),
     movieTicketOverlay: $('movieTicketOverlay'),
     movieTicketZoomOverlay: $('movieTicketZoomOverlay'),
+    movieShowTicketMobileBtn: $('movieShowTicketMobileBtn'),
+    movieShowTicketMobileText: $('movieShowTicketMobileText'),
     saveMovieRatingBtn: $('saveMovieRatingBtn'),
     deleteMovieBtn: $('deleteMovieBtn'),
     // image lightbox
@@ -129,6 +213,10 @@
     dayModal: $('dayModal'),
     dayModalTitle: $('dayModalTitle'), dayModalList: $('dayModalList'),
     dayModalFooter: $('dayModalFooter'), detailPhotoInput: $('detailPhotoInput'),
+    dayAddDropdownBtn: $('dayAddDropdownBtn'),
+    dayAddDropdownMenu: $('dayAddDropdownMenu'),
+    dayAddMovieOptionBtn: $('dayAddMovieOptionBtn'),
+    dayAddFoodOptionBtn: $('dayAddFoodOptionBtn'),
     // event modal
     eventModal: $('eventModal'), eventForm: $('eventForm'),
     eventModalTitle: $('eventModalTitle'), eventId: $('eventId'),
@@ -230,18 +318,43 @@
     return result;
   }
 
+  const DEFAULT_MOVIES_LIST = [
+    { id: 'mov_1_spider_verse_2', title: 'Spider-Man: Across the Spider-Verse', year: '2023', poster: 'https://images.metahub.space/poster/small/tt9362722/img', ticket: '', rating: '9.5', date: '2026-08-20' },
+    { id: 'mov_2_oppenheimer', title: 'Oppenheimer', year: '2023', poster: 'https://images.metahub.space/poster/small/tt15398776/img', ticket: '', rating: '9.0', date: '2026-08-18' },
+    { id: 'mov_3_interstellar', title: 'Interstellar', year: '2014', poster: 'https://images.metahub.space/poster/small/tt0816692/img', ticket: '', rating: '9.5', date: '2026-08-16' },
+    { id: 'mov_4_dune_2', title: 'Dune: Part Two', year: '2024', poster: 'https://images.metahub.space/poster/small/tt15239678/img', ticket: '', rating: '9.0', date: '2026-08-14' },
+    { id: 'mov_5_dark_knight', title: 'The Dark Knight', year: '2008', poster: 'https://images.metahub.space/poster/small/tt0468569/img', ticket: '', rating: '10.0', date: '2026-08-12' },
+    { id: 'mov_6_inception', title: 'Inception', year: '2010', poster: 'https://images.metahub.space/poster/small/tt1375666/img', ticket: '', rating: '9.0', date: '2026-08-10' },
+    { id: 'mov_7_eeao', title: 'Everything Everywhere All at Once', year: '2022', poster: 'https://images.metahub.space/poster/small/tt6710474/img', ticket: '', rating: '8.5', date: '2026-08-08' },
+    { id: 'mov_8_spirited_away', title: 'Spirited Away', year: '2001', poster: 'https://images.metahub.space/poster/small/tt0245429/img', ticket: '', rating: '9.5', date: '2026-08-06' },
+    { id: 'mov_9_la_la_land', title: 'La La Land', year: '2016', poster: 'https://images.metahub.space/poster/small/tt3783958/img', ticket: '', rating: '8.5', date: '2026-08-04' },
+    { id: 'mov_10_parasite', title: 'Parasite', year: '2019', poster: 'https://images.metahub.space/poster/small/tt6751668/img', ticket: '', rating: '9.0', date: '2026-08-02' },
+    { id: 'mov_11_gotg_3', title: 'Guardians of the Galaxy Vol. 3', year: '2023', poster: 'https://images.metahub.space/poster/small/tt6791350/img', ticket: '', rating: '8.5', date: '2026-07-30' },
+    { id: 'mov_12_whiplash', title: 'Whiplash', year: '2014', poster: 'https://images.metahub.space/poster/small/tt2582802/img', ticket: '', rating: '9.0', date: '2026-07-28' },
+    { id: 'mov_13_coco', title: 'Coco', year: '2017', poster: 'https://images.metahub.space/poster/small/tt2380307/img', ticket: '', rating: '8.5', date: '2026-07-25' },
+    { id: 'mov_14_your_name', title: 'Your Name.', year: '2016', poster: 'https://images.metahub.space/poster/small/tt5311514/img', ticket: '', rating: '9.0', date: '2026-07-22' },
+    { id: 'mov_15_avatar_2', title: 'Avatar: The Way of Water', year: '2022', poster: 'https://images.metahub.space/poster/small/tt1630029/img', ticket: '', rating: '7.5', date: '2026-07-20' },
+    { id: 'mov_16_the_batman', title: 'The Batman', year: '2022', poster: 'https://images.metahub.space/poster/small/tt1877830/img', ticket: '', rating: '8.0', date: '2026-07-18' },
+    { id: 'mov_17_inside_out_2', title: 'Inside Out 2', year: '2024', poster: 'https://images.metahub.space/poster/small/tt22022452/img', ticket: '', rating: '8.5', date: '2026-07-15' },
+    { id: 'mov_18_top_gun_2', title: 'Top Gun: Maverick', year: '2022', poster: 'https://images.metahub.space/poster/small/tt1745960/img', ticket: '', rating: '8.5', date: '2026-07-12' },
+    { id: 'mov_19_suzume', title: 'Suzume', year: '2022', poster: 'https://images.metahub.space/poster/small/tt16428256/img', ticket: '', rating: '8.0', date: '2026-07-10' },
+    { id: 'mov_20_spider_verse_1', title: 'Spider-Man: Into the Spider-Verse', year: '2018', poster: 'https://images.metahub.space/poster/small/tt4633694/img', ticket: '', rating: '9.5', date: '2026-07-08' },
+  ];
+
   function loadEvents() {
     try { events = JSON.parse(localStorage.getItem(KEY_EVENTS)) || []; }
     catch { events = []; }
     try {
       const cached = JSON.parse(localStorage.getItem(KEY_MOVIES));
-      if (Array.isArray(cached)) {
-        movies = deduplicateMovies(cached.filter((m) => m && m.id && !m.id.startsWith('sample_mov_')));
+      if (Array.isArray(cached) && cached.length > 0) {
+        movies = deduplicateMovies(cached.filter((m) => m && m.id));
       } else {
-        movies = [];
+        movies = [...DEFAULT_MOVIES_LIST];
+        saveMovies();
       }
     } catch {
-      movies = [];
+      movies = [...DEFAULT_MOVIES_LIST];
+      saveMovies();
     }
   }
   function saveEvents() {
@@ -282,7 +395,8 @@
     try {
       const r = await fetch(API_URL, { cache: 'no-store' });
       if (!r.ok) { remoteOn = false; return; }
-      const data = await r.json();
+      const data = await safeJson(r);
+      if (!data) { remoteOn = false; return; }
       remoteOn = true;
       const remoteEvents = Array.isArray(data.events) ? data.events : [];
       if (remoteEvents.length === 0 && events.length > 0) {
@@ -292,12 +406,14 @@
         try { localStorage.setItem(KEY_EVENTS, JSON.stringify(events)); } catch {}
       }
 
-      if (Array.isArray(data.movies)) {
-        const cleanRemote = data.movies.filter((m) => m && m.id && !m.id.startsWith('sample_mov_'));
+      if (Array.isArray(data.movies) && data.movies.length > 0) {
+        const cleanRemote = data.movies.filter((m) => m && m.id);
         movies = deduplicateMovies(cleanRemote);
         try { localStorage.setItem(KEY_MOVIES, JSON.stringify(movies)); } catch {}
-      } else {
-        movies = [];
+      } else if (movies.length === 0) {
+        movies = [...DEFAULT_MOVIES_LIST];
+        try { localStorage.setItem(KEY_MOVIES, JSON.stringify(movies)); } catch {}
+        pushRemote();
       }
 
       renderAll();
@@ -319,7 +435,7 @@
       if (userTheme === 'pink' || userTheme === 'dark') {
         currentTheme = userTheme;
       } else {
-        const matched = TEST_USERS.find((u) => u.username === currentUser.username);
+        const matched = DEFAULT_USERS.find((u) => u.username === currentUser.username);
         currentTheme = (matched && matched.theme) ? matched.theme : 'dark';
       }
     } else {
@@ -375,6 +491,15 @@
     if (saved) {
       try {
         currentUser = JSON.parse(saved);
+        if (currentUser && !currentUser.permissions) {
+          const isLg = currentUser.username && (currentUser.username.toLowerCase() === 'lgiifn' || currentUser.username.toLowerCase() === 'ysfany');
+          currentUser.permissions = {
+            canManageEvents: true,
+            canManageMovies: true,
+            canManageUsers: isLg || currentUser.role === 'admin',
+          };
+          currentUser.role = currentUser.role || (isLg ? 'admin' : 'editor');
+        }
       } catch (e) {
         currentUser = null;
       }
@@ -388,6 +513,7 @@
     const ownerRole = $('profileOwnerRole');
     const loginBtn = $('openLoginModalBtn');
     const logoutBtn = $('logoutBtn');
+    const settingsBtn = $('openSettingsModalBtn');
 
     // Blur protected containers in guest mode (not logged in)
     document.documentElement.classList.toggle('is-guest', !currentUser);
@@ -401,46 +527,121 @@
         logoutBtn.classList.remove('hidden');
         logoutBtn.classList.add('flex');
       }
+
+      // Show settings button only if user has canManageUsers permission
+      const canManageUsers = currentUser.permissions && currentUser.permissions.canManageUsers;
+      if (settingsBtn) {
+        settingsBtn.classList.toggle('hidden', !canManageUsers);
+        settingsBtn.classList.toggle('flex', !!canManageUsers);
+      }
     } else {
       if (headerInfo) headerInfo.classList.add('hidden');
       if (loginBtn) {
         loginBtn.classList.remove('hidden');
         loginBtn.classList.add('flex');
       }
-      if (logoutBtn) logoutBtn.classList.add('hidden');
+      if (logoutBtn) {
+        logoutBtn.classList.add('hidden');
+        logoutBtn.classList.remove('flex');
+      }
+      if (settingsBtn) {
+        settingsBtn.classList.add('hidden');
+        settingsBtn.classList.remove('flex');
+      }
     }
   }
 
-  function handleLoginSubmit(e) {
+  async function handleLoginSubmit(e) {
     e.preventDefault();
     const username = (el.loginUsername ? el.loginUsername.value : '').trim().toLowerCase();
     const password = (el.loginPassword ? el.loginPassword.value : '').trim();
 
-    const matchedUser = TEST_USERS.find(
-      (u) => u.username.toLowerCase() === username && u.pass === password
-    );
+    if (!username || !password) return;
 
-    if (matchedUser) {
-      currentUser = {
-        username: matchedUser.username,
-        name: matchedUser.name,
-        sex: matchedUser.sex
-      };
-      localStorage.setItem(KEY_AUTH_USER, JSON.stringify(currentUser));
+    const submitBtn = el.loginForm ? el.loginForm.querySelector('button[type="submit"]') : null;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Logging in...';
+    }
 
-      // Load user's saved theme preference or default
-      const savedUserTheme = localStorage.getItem(`tigabelas.theme.${matchedUser.username}`);
-      currentTheme = (savedUserTheme === 'pink' || savedUserTheme === 'dark') ? savedUserTheme : (matchedUser.theme || 'dark');
-      localStorage.setItem(KEY_THEME, currentTheme);
-      applyTheme();
+    try {
+      let matchedUser = null;
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'login', username, password }),
+        });
+        const data = await safeJson(res);
+        if (res.ok && data && data.ok && data.user) {
+          matchedUser = data.user;
+        }
+      } catch (err) {
+        console.warn('API login error, trying local fallback:', err);
+      }
 
-      renderAuthState();
-      if (el.loginErrorMsg) el.loginErrorMsg.classList.add('hidden');
-      if (el.loginForm) el.loginForm.reset();
-      closeModal(el.loginModal);
-      if (el.profileDropdown) el.profileDropdown.classList.add('hidden');
-    } else {
-      if (el.loginErrorMsg) el.loginErrorMsg.classList.remove('hidden');
+      // Local fallback for offline / development
+      if (!matchedUser) {
+        const localList = getLocalUsers();
+        const fallback = localList.find(
+          (u) => u.username.toLowerCase() === username && String(u.pass) === password
+        );
+        if (fallback) {
+          matchedUser = {
+            id: fallback.id,
+            username: fallback.username,
+            name: fallback.name,
+            sex: fallback.sex,
+            theme: fallback.theme,
+            role: fallback.role || 'admin',
+            permissions: fallback.permissions || {
+              canManageEvents: true,
+              canManageMovies: true,
+              canManageUsers: fallback.role === 'admin',
+            },
+          };
+        }
+      }
+
+      if (matchedUser) {
+        currentUser = {
+          id: matchedUser.id,
+          username: matchedUser.username,
+          name: matchedUser.name,
+          sex: matchedUser.sex,
+          theme: matchedUser.theme || 'dark',
+          role: matchedUser.role || 'editor',
+          permissions: matchedUser.permissions || {
+            canManageEvents: true,
+            canManageMovies: true,
+            canManageUsers: matchedUser.role === 'admin',
+          },
+        };
+        localStorage.setItem(KEY_AUTH_USER, JSON.stringify(currentUser));
+
+        // Load user's saved theme preference or default
+        const savedUserTheme = localStorage.getItem(`tigabelas.theme.${matchedUser.username}`);
+        currentTheme = (savedUserTheme === 'pink' || savedUserTheme === 'dark') ? savedUserTheme : (matchedUser.theme || 'dark');
+        localStorage.setItem(KEY_THEME, currentTheme);
+        applyTheme();
+
+        renderAuthState();
+        if (el.loginErrorMsg) el.loginErrorMsg.classList.add('hidden');
+        if (el.loginForm) el.loginForm.reset();
+        closeModal(el.loginModal);
+        if (el.profileDropdown) el.profileDropdown.classList.add('hidden');
+        toast(`Welcome back, ${currentUser.name}!`);
+      } else {
+        if (el.loginErrorMsg) {
+          el.loginErrorMsg.textContent = 'Invalid username or password.';
+          el.loginErrorMsg.classList.remove('hidden');
+        }
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Log In';
+      }
     }
   }
 
@@ -449,6 +650,9 @@
     localStorage.removeItem(KEY_AUTH_USER);
     renderAuthState();
     if (el.profileDropdown) el.profileDropdown.classList.add('hidden');
+    if (el.profileBackdrop) el.profileBackdrop.classList.add('hidden');
+    document.documentElement.classList.remove('is-profile-open');
+    toast('Logged out');
   }
 
   /* ---------- Render kalender ---------- */
@@ -491,7 +695,9 @@
 
       const key = dateKey(new Date(viewYear, viewMonth, dayNum));
       const isToday = key === tKey;
-      const hasEvent = !!eventForDate(key);
+      const ev = eventForDate(key);
+      const hasEvent = !!ev;
+      const hasPhoto = hasEvent && !!ev.photo;
 
       const numClass = isToday
         ? 'flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-xs font-bold text-white dark:bg-white dark:text-neutral-900'
@@ -501,10 +707,15 @@
         ? 'border-neutral-900 dark:border-white'
         : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700';
 
-      // event indicator — a single dot when the date has an event (lifted up a bit)
-      const dot = hasEvent
-        ? '<span data-ad class="mb-1.5 h-1.5 w-1.5 rounded-full bg-neutral-900 dark:bg-white sm:mb-2"></span>'
-        : '<span class="mb-1.5 h-1.5 w-1.5 sm:mb-2"></span>';
+      // event indicator — yellow if event has NO photo, white/theme if photo exists
+      let dot = '<span class="mb-1.5 h-1.5 w-1.5 sm:mb-2"></span>';
+      if (hasEvent) {
+        if (hasPhoto) {
+          dot = '<span data-ad class="mb-1.5 h-1.5 w-1.5 rounded-full bg-neutral-900 dark:bg-white sm:mb-2"></span>';
+        } else {
+          dot = '<span class="mb-1.5 h-1.5 w-1.5 rounded-full bg-amber-400 sm:mb-2 shadow-xs"></span>';
+        }
+      }
 
       html += `
         <button type="button" data-day="${key}" ${isToday ? 'data-today' : ''}
@@ -544,11 +755,14 @@
       </button>`;
   }
 
-  // Samakan tinggi sidebar dengan tinggi card kalender (khusus layar lebar).
+  // Samakan tinggi sidebar dengan tinggi card kalender (khusus layar lebar & tampilan kalender).
   function syncSidebarHeight(isLarge) {
-    if (isLarge && el.calendarCard) {
-      el.sidebar.style.height = el.calendarCard.offsetHeight + 'px';
+    if (!el.sidebar) return;
+    if (isLarge && currentView === 'calendar' && el.calendarCard && el.calendarCard.offsetHeight > 0) {
+      el.sidebar.style.minHeight = el.calendarCard.offsetHeight + 'px';
+      el.sidebar.style.height = '';
     } else {
+      el.sidebar.style.minHeight = '';
       el.sidebar.style.height = '';
     }
   }
@@ -633,8 +847,11 @@
     const yrProgress = getYearProgress(viewYear);
     const pctFormatted = yrProgress.pct >= 1 ? yrProgress.pct.toFixed(1) : yrProgress.pct.toFixed(2);
     const actualPct = Math.max(yrProgress.pct, yrProgress.passed > 0 ? 1 : 0);
-    const basePct = Math.min(90, actualPct);
-    const greenPct = actualPct > 90 ? actualPct - 90 : 0;
+
+    // Segment widths: <=10% Yellow, 10-90% White/Theme, >90% Green
+    const yellowPct = Math.min(10, actualPct);
+    const whitePct = actualPct > 10 ? Math.min(80, actualPct - 10) : 0;
+    const greenPct = actualPct > 90 ? Math.min(10, actualPct - 90) : 0;
 
     if (el.statsDaysProgress) {
       el.statsDaysProgress.innerHTML = `
@@ -657,8 +874,10 @@
             </div>
           </div>
           <div class="relative h-2.5 w-full overflow-hidden rounded-full bg-neutral-200/70 dark:bg-neutral-700/60">
-            <!-- 0% to 90% theme segment -->
-            <div class="tgbls-fill absolute inset-y-0 left-0 bg-neutral-900 transition-all duration-500 dark:bg-white" data-af style="width: ${basePct}%"></div>
+            <!-- 0% to 10% yellow segment -->
+            ${yellowPct > 0 ? `<div class="absolute inset-y-0 left-0 bg-amber-400 transition-all duration-500" style="width: ${yellowPct}%"></div>` : ''}
+            <!-- 10% to 90% white / theme segment -->
+            ${whitePct > 0 ? `<div class="tgbls-fill absolute inset-y-0 bg-neutral-900 transition-all duration-500 dark:bg-white" data-af style="left: 10%; width: ${whitePct}%"></div>` : ''}
             <!-- >90% green segment -->
             ${greenPct > 0 ? `<div class="absolute inset-y-0 bg-emerald-500 transition-all duration-500" style="left: 90%; width: ${greenPct}%"></div>` : ''}
             <div class="pointer-events-none absolute inset-0 z-10">
@@ -718,6 +937,21 @@
     if (el.toggleMovieSelectBtn) {
       el.toggleMovieSelectBtn.classList.toggle('hidden', isWatchedSearchActive || movies.length === 0);
     }
+    if (el.moviesDesktopControls) {
+      // Desktop controls wrapper stays visible so openMovieSearchBtn (acting as back button) remains accessible
+      el.moviesDesktopControls.classList.remove('hidden');
+      el.moviesDesktopControls.classList.add('sm:flex');
+    }
+    if (el.openMovieSearchBtn) {
+      el.openMovieSearchBtn.classList.remove('hidden');
+    }
+    if (el.movieMobileActionsBtn) {
+      el.movieMobileActionsBtn.classList.toggle('hidden', isWatchedSearchActive);
+    }
+    if (el.movieMobileSearchCloseBtn) {
+      el.movieMobileSearchCloseBtn.classList.toggle('hidden', !isWatchedSearchActive);
+      el.movieMobileSearchCloseBtn.classList.toggle('inline-flex', isWatchedSearchActive);
+    }
     if (el.moviesPager) {
       el.moviesPager.classList.toggle('hidden', isWatchedSearchActive);
     }
@@ -750,17 +984,24 @@
   }
 
   function updateMovieSelectControls() {
-    if (el.toggleMovieSelectBtn) {
-      el.toggleMovieSelectBtn.classList.toggle('hidden', isMovieSelectMode || isWatchedSearchActive || movies.length === 0);
+    if (el.moviesDesktopControls) {
+      el.moviesDesktopControls.classList.toggle('hidden', isMovieSelectMode);
+      el.moviesDesktopControls.classList.toggle('sm:flex', !isMovieSelectMode);
     }
     if (el.openAddMovieBtn) {
       el.openAddMovieBtn.classList.toggle('hidden', isMovieSelectMode || isWatchedSearchActive);
     }
+    if (el.toggleMovieSelectBtn) {
+      el.toggleMovieSelectBtn.classList.toggle('hidden', isMovieSelectMode || isWatchedSearchActive || movies.length === 0);
+    }
     if (el.openMovieSearchBtn) {
       el.openMovieSearchBtn.classList.toggle('hidden', isMovieSelectMode);
     }
+    if (el.movieMobileActionsWrap) {
+      el.movieMobileActionsWrap.classList.toggle('hidden', isMovieSelectMode);
+    }
     if (el.moviesPager) {
-      el.moviesPager.classList.toggle('hidden', isMovieSelectMode || isWatchedSearchActive);
+      el.moviesPager.classList.toggle('hidden', isWatchedSearchActive);
     }
     if (el.moviesSelectControls) {
       el.moviesSelectControls.classList.toggle('hidden', !isMovieSelectMode);
@@ -813,6 +1054,14 @@
   }
 
   function handleDeleteSelectedMovies() {
+    if (!currentUser) {
+      toast('Please log in first.');
+      return;
+    }
+    if (currentUser.permissions && !currentUser.permissions.canManageMovies) {
+      toast('You do not have permission to delete movies.');
+      return;
+    }
     if (selectedMovieIds.size === 0) return;
     const count = selectedMovieIds.size;
     const msg = count === 1 ? 'Delete 1 selected movie?' : `Delete ${count} selected movies?`;
@@ -970,7 +1219,7 @@
 
     // Pager (Top Right Header)
     if (el.moviesPager) {
-      if (isMovieSelectMode || isWatchedSearchActive || totalPages <= 1) {
+      if (isWatchedSearchActive) {
         el.moviesPager.classList.add('hidden');
         el.moviesPager.classList.remove('flex');
         el.moviesPager.innerHTML = '';
@@ -979,11 +1228,11 @@
         el.moviesPager.classList.add('flex');
         const navBtn = (data, dis, svg, title) =>
           `<button type="button" ${data} ${dis ? 'disabled' : ''} title="${title}"
-            class="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 transition hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent dark:border-neutral-800 dark:hover:bg-neutral-800">${svg}</button>`;
+            class="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 transition hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:border-neutral-800 dark:hover:bg-neutral-800">${svg}</button>`;
         el.moviesPager.innerHTML = `
           <div class="h-4 w-px bg-neutral-200 dark:bg-neutral-800 mx-0.5" aria-hidden="true"></div>
-          ${navBtn('data-movie-prev', moviesPage === 0, '<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>', 'Previous page')}
-          ${navBtn('data-movie-next', moviesPage === totalPages - 1, '<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>', 'Next page')}`;
+          ${navBtn('data-movie-prev', moviesPage === 0, '<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>', 'Previous page')}
+          ${navBtn('data-movie-next', moviesPage >= totalPages - 1, '<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>', 'Next page')}`;
       }
     }
   }
@@ -992,7 +1241,17 @@
   let searchDebounceTimer = null;
   let selectedMovieData = null;
 
-  function openAddMovie() {
+  function openAddMovie(defaultDate) {
+    if (!currentUser) {
+      toast('Please log in first.');
+      if (el.loginForm) el.loginForm.reset();
+      openModal(el.loginModal);
+      return;
+    }
+    if (currentUser.permissions && !currentUser.permissions.canManageMovies) {
+      toast('You do not have permission to add movies.');
+      return;
+    }
     if (!el.addMovieModal) return;
     el.addMovieForm.reset();
     selectedMovieData = null;
@@ -1001,7 +1260,7 @@
       el.selectedMovieCard.classList.add('hidden');
       el.selectedMovieCard.classList.remove('flex');
     }
-    if (el.movieDateInput) el.movieDateInput.value = todayKey();
+    if (el.movieDateInput) el.movieDateInput.value = defaultDate || todayKey();
     openModal(el.addMovieModal);
     setTimeout(() => {
       if (el.movieSearchInput) el.movieSearchInput.focus();
@@ -1027,15 +1286,17 @@
       const imdbUrl = 'https://v3.sg.media-imdb.com/suggestion/x/' + encodeURIComponent(slug) + '.json';
       const res = await fetch(imdbUrl);
       if (res.ok) {
-        const data = await res.json();
-        const items = (data.d || []).filter((item) => item.l && (item.i || item.y));
-        items.forEach((m) => {
-          results.push({
-            name: m.l,
-            year: m.y ? String(m.y) : '',
-            poster: m.i ? m.i.imageUrl : ''
+        const data = await safeJson(res);
+        if (data && Array.isArray(data.d)) {
+          const items = data.d.filter((item) => item.l && (item.i || item.y));
+          items.forEach((m) => {
+            results.push({
+              name: m.l,
+              year: m.y ? String(m.y) : '',
+              poster: m.i ? m.i.imageUrl : ''
+            });
           });
-        });
+        }
       }
     } catch (err) {
       console.warn('IMDb suggestion error, falling back:', err);
@@ -1047,14 +1308,16 @@
         const cmUrl = 'https://v3-cinemeta.strem.io/catalog/movie/top/search=' + encodeURIComponent(q) + '.json';
         const res = await fetch(cmUrl);
         if (res.ok) {
-          const data = await res.json();
-          (data.metas || []).filter((m) => m && m.name).forEach((m) => {
-            results.push({
-              name: m.name,
-              year: m.year || (m.releaseInfo ? String(m.releaseInfo).slice(0, 4) : ''),
-              poster: m.poster || (m.imdb_id ? `https://images.metahub.space/poster/small/${m.imdb_id}/img` : '')
+          const data = await safeJson(res);
+          if (data && Array.isArray(data.metas)) {
+            data.metas.filter((m) => m && m.name).forEach((m) => {
+              results.push({
+                name: m.name,
+                year: m.year || (m.releaseInfo ? String(m.releaseInfo).slice(0, 4) : ''),
+                poster: m.poster || (m.imdb_id ? `https://images.metahub.space/poster/small/${m.imdb_id}/img` : '')
+              });
             });
-          });
+          }
         }
       } catch (err) {
         console.warn('Cinemeta error:', err);
@@ -1171,6 +1434,12 @@
       if (el.movieTicketZoomOverlay) {
         el.movieTicketZoomOverlay.classList.toggle('hidden', isMovieDetailEditing);
       }
+      if (el.movieShowTicketMobileBtn) {
+        el.movieShowTicketMobileBtn.disabled = false;
+      }
+      if (el.movieShowTicketMobileText) {
+        el.movieShowTicketMobileText.textContent = isMovieDetailEditing ? 'Change Ticket' : 'Show Ticket';
+      }
     } else {
       if (el.movieTicketPreview) {
         el.movieTicketPreview.src = '';
@@ -1179,6 +1448,28 @@
       if (el.movieTicketEmptyState) el.movieTicketEmptyState.classList.remove('hidden');
       if (el.movieTicketOverlay) el.movieTicketOverlay.classList.add('hidden');
       if (el.movieTicketZoomOverlay) el.movieTicketZoomOverlay.classList.add('hidden');
+      if (el.movieShowTicketMobileBtn) {
+        el.movieShowTicketMobileBtn.disabled = !isMovieDetailEditing;
+      }
+      if (el.movieShowTicketMobileText) {
+        el.movieShowTicketMobileText.textContent = isMovieDetailEditing ? 'Upload Ticket' : 'No Ticket';
+      }
+    }
+  }
+
+  function formatRatingDisplay(val) {
+    if (val === null || val === undefined || val === '') return '';
+    const num = typeof val === 'number' ? val : parseFloat(val);
+    if (isNaN(num) || num <= 0) return '';
+    return num % 1 === 0 ? String(Math.round(num)) : num.toFixed(1);
+  }
+
+  function setDetailRatingDisplay(val) {
+    if (!el.detailRatingInput) return;
+    const formatted = formatRatingDisplay(val) || '—';
+    el.detailRatingInput.textContent = formatted;
+    if ('value' in el.detailRatingInput) {
+      el.detailRatingInput.value = formatted;
     }
   }
 
@@ -1193,17 +1484,18 @@
     el.ratingSliderBubble.style.left = `calc(${pct * 100}% + ${thumbOffset}px)`;
 
     const span = el.ratingSliderBubble.querySelector('span');
+    const formatted = formatRatingDisplay(val) || '0';
     if (span) {
-      span.textContent = val.toFixed(1);
+      span.textContent = formatted;
     }
 
-    if (el.detailRatingInput) {
-      el.detailRatingInput.value = val > 0 ? val.toFixed(1) : '';
-    }
+    setDetailRatingDisplay(val);
   }
 
   function setRatingEditMode(isEditing) {
     isMovieDetailEditing = isEditing;
+    const canManage = currentUser && (!currentUser.permissions || currentUser.permissions.canManageMovies);
+
     if (el.ratingViewMode) el.ratingViewMode.classList.toggle('hidden', isEditing);
     if (el.ratingEditMode) {
       el.ratingEditMode.classList.toggle('hidden', !isEditing);
@@ -1212,7 +1504,15 @@
         setTimeout(updateRatingSliderBubble, 20);
       }
     }
-    if (el.saveMovieRatingBtn) el.saveMovieRatingBtn.classList.toggle('hidden', !isEditing);
+    if (el.editMovieRatingBtn) {
+      el.editMovieRatingBtn.classList.toggle('hidden', isEditing || !canManage);
+    }
+    if (el.saveMovieRatingBtn) {
+      el.saveMovieRatingBtn.classList.toggle('hidden', !isEditing || !canManage);
+    }
+    if (el.deleteMovieBtn) {
+      el.deleteMovieBtn.classList.toggle('hidden', !canManage);
+    }
     renderTicketPreview(activeTicketPhoto);
   }
 
@@ -1270,13 +1570,9 @@
 
     const initialRate = (movie.rating && parseFloat(movie.rating) > 0) ? parseFloat(movie.rating) : 0;
     if (el.movieRatingSlider) el.movieRatingSlider.value = initialRate;
-    if (el.detailRatingInput) el.detailRatingInput.value = movie.rating || '';
+    setDetailRatingDisplay(movie.rating);
 
-    if (isNew) {
-      setRatingEditMode(true);
-    } else {
-      setRatingEditMode(!movie.rating);
-    }
+    setRatingEditMode(Boolean(isNew));
 
     activeTicketPhoto = movie.ticket || null;
     renderTicketPreview(activeTicketPhoto);
@@ -1291,7 +1587,8 @@
 
     const num = el.movieRatingSlider ? parseFloat(el.movieRatingSlider.value) : (parseFloat(el.detailRatingInput?.value) || 0);
     if (num > 0) {
-      movie.rating = Math.min(10, Math.max(0, num)).toFixed(1);
+      const clamped = Math.min(10, Math.max(0, num));
+      movie.rating = formatRatingDisplay(clamped);
     } else {
       movie.rating = '';
     }
@@ -1303,9 +1600,7 @@
     renderStats();
 
     // Return to preview/view mode instead of closing the modal
-    if (el.detailRatingInput) {
-      el.detailRatingInput.value = movie.rating || '';
-    }
+    setDetailRatingDisplay(movie.rating);
     setRatingEditMode(false);
   }
 
@@ -1372,6 +1667,9 @@
     } else if (view === 'calendar') {
       renderCalendar();
     }
+    const isLarge = window.matchMedia('(min-width: 1024px)').matches;
+    syncSidebarHeight(isLarge);
+    renderUpcoming();
   }
 
   function openCategoryPage(cat) {
@@ -1417,25 +1715,23 @@
     return { days, hrs, min, sec, total: remaining };
   }
 
-  function getEventCountdownProgress(evDate, evCreatedAt) {
+  function getEventCountdownProgress(evDate) {
     if (!evDate) return 0;
     const target = parseKey(evDate);
     target.setHours(0, 0, 0, 0);
     const targetTime = target.getTime();
     const now = Date.now();
-    if (now >= targetTime) return 100;
+    const remaining = targetTime - now;
 
-    let startTime = evCreatedAt ? new Date(evCreatedAt).getTime() : 0;
-    if (!startTime || startTime >= targetTime) {
-      const startOfMonth = new Date(target.getFullYear(), target.getMonth(), 1).getTime();
-      startTime = Math.min(startOfMonth, targetTime - 30 * 86400000);
-      if (now < startTime) startTime = now - 7 * 86400000;
+    if (remaining <= 0) return 100;
+
+    const ONE_HOUR_MS = 60 * 60 * 1000; // 3,600,000 ms (1 hour)
+    if (remaining > ONE_HOUR_MS) {
+      return 0; // Starts moving only when <= 1 hour left
     }
 
-    const totalSpan = targetTime - startTime;
-    if (totalSpan <= 0) return 0;
-    const elapsed = now - startTime;
-    return Math.max(1, Math.min(99.5, (elapsed / totalSpan) * 100));
+    const elapsed = ONE_HOUR_MS - remaining;
+    return Math.max(0, Math.min(100, (elapsed / ONE_HOUR_MS) * 100));
   }
 
   function formatCountdownString(dateStr) {
@@ -1475,9 +1771,12 @@
     document.querySelectorAll('[data-perimeter-progress]').forEach((progEl) => {
       const dateKey = progEl.dataset.perimeterProgress;
       if (!dateKey) return;
-      const eventObj = eventForDate(dateKey);
-      const pct = getEventCountdownProgress(dateKey, eventObj ? eventObj.createdAt : null);
+      const pct = getEventCountdownProgress(dateKey);
       progEl.setAttribute('stroke-dashoffset', String((100 - pct).toFixed(2)));
+      const svgEl = progEl.closest('svg');
+      if (svgEl) {
+        svgEl.classList.toggle('hidden', pct <= 0);
+      }
     });
 
     if (needsDayRerender) {
@@ -1495,7 +1794,18 @@
   }
 
   /* ---------- Modal helpers ---------- */
-  const MODALS = () => [el.imageLightboxModal, el.movieDetailModal, el.addMovieModal, el.eventModal, el.dayModal, el.linkedPhotoModal, el.loginModal];
+  const MODALS = () => [
+    el.userFormModal,
+    el.settingsModal,
+    el.bookmarksModal,
+    el.imageLightboxModal,
+    el.movieDetailModal,
+    el.addMovieModal,
+    el.eventModal,
+    el.dayModal,
+    el.linkedPhotoModal,
+    el.loginModal,
+  ];
   function anyModalOpen() { return MODALS().some((m) => m && !m.classList.contains('hidden')); }
   function openModal(m) {
     if (!m) return;
@@ -1516,6 +1826,358 @@
     }
   }
 
+  /* ---------- Bookmarks Modal ---------- */
+  function renderBookmarksList() {
+    if (!el.bookmarksList) return;
+    const bookmarkedEvents = events.filter((e) => e && e.bookmarked);
+    if (el.bookmarksCountBadge) el.bookmarksCountBadge.textContent = String(bookmarkedEvents.length);
+
+    if (!bookmarkedEvents.length) {
+      el.bookmarksList.innerHTML = `
+        <div class="py-12 text-center text-xs text-neutral-400">
+          <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+            </svg>
+          </div>
+          <p class="font-medium text-neutral-600 dark:text-neutral-300">No bookmarked events yet</p>
+          <p class="mt-1 text-[11px]">Click the bookmark ribbon in any event to save it here.</p>
+        </div>`;
+      return;
+    }
+
+    el.bookmarksList.innerHTML = bookmarkedEvents.map((ev) => {
+      const d = parseKey(ev.date);
+      const dayName = WEEKDAYS_LONG[d.getDay()].slice(0, 3);
+      const monthName = MONTHS[d.getMonth()].slice(0, 3);
+      const dateDisplay = `${dayName}, ${d.getDate()} ${monthName} ${d.getFullYear()}`;
+
+      let caption = '';
+      if (ev.desc && ev.desc.trim()) {
+        caption = ev.desc.replace(/^@(luigi|fany|l|u|f):\s*/i, '').trim().slice(0, 45);
+      }
+
+      return `
+        <div class="group flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white p-3 transition hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700 dark:hover:bg-neutral-800/60">
+          <button type="button" data-open-bookmark-date="${ev.date}" class="flex flex-1 items-center gap-3 min-w-0 text-left">
+            <div class="flex h-10 w-10 flex-shrink-0 flex-col items-center justify-center rounded-lg bg-neutral-100 py-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+              <span class="text-sm font-bold leading-none">${d.getDate()}</span>
+              <span class="text-[9px] font-medium uppercase">${monthName}</span>
+            </div>
+            ${ev.photo ? `<img src="${ev.photo}" alt="Thumb" class="h-10 w-10 flex-shrink-0 rounded-lg object-cover bg-neutral-900 shadow-xs" />` : ''}
+            <div class="min-w-0 flex-1">
+              <h4 class="truncate text-xs sm:text-sm font-bold text-neutral-900 dark:text-white">${escapeHtml(ev.title)}</h4>
+              <p class="truncate text-[11px] text-neutral-500 dark:text-neutral-400">${caption ? `"${escapeHtml(caption)}"` : dateDisplay}</p>
+            </div>
+          </button>
+          <button type="button" data-unbookmark-date="${ev.date}" title="Remove bookmark"
+            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-neutral-400 transition hover:bg-red-50 hover:text-red-500 active:scale-95 dark:text-neutral-500 dark:hover:bg-red-950/40 dark:hover:text-red-400">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>`;
+    }).join('');
+  }
+
+  function openBookmarksModal() {
+    renderBookmarksList();
+    openModal(el.bookmarksModal);
+  }
+
+  /* ---------- User Settings & Management ---------- */
+  let cachedUsers = [];
+
+  async function fetchUsersList() {
+    try {
+      const res = await fetch('/api/auth');
+      if (res.ok) {
+        const data = await safeJson(res);
+        if (data && data.ok && Array.isArray(data.users)) {
+          cachedUsers = data.users;
+          setLocalUsers(cachedUsers);
+          return cachedUsers;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch users from API:', e);
+    }
+    // Local fallback
+    const local = getLocalUsers();
+    cachedUsers = local.map((u) => ({
+      id: u.id,
+      username: u.username,
+      name: u.name,
+      sex: u.sex,
+      theme: u.theme,
+      role: u.role || 'admin',
+      permissions: u.permissions || {
+        canManageEvents: true,
+        canManageMovies: true,
+        canManageUsers: u.role === 'admin',
+      },
+      createdAt: u.createdAt || Date.now(),
+    }));
+    return cachedUsers;
+  }
+
+  async function openSettingsModal() {
+    if (el.profileDropdown) el.profileDropdown.classList.add('hidden');
+    if (el.profileBackdrop) el.profileBackdrop.classList.add('hidden');
+    document.documentElement.classList.remove('is-profile-open');
+    openModal(el.settingsModal);
+    renderUsersListLoading();
+    await fetchUsersList();
+    renderUsersList();
+  }
+
+  function renderUsersListLoading() {
+    if (!el.usersListContainer) return;
+    el.usersListContainer.innerHTML = `
+      <div class="flex items-center justify-center py-8 text-xs text-neutral-400">
+        <svg class="h-4 w-4 animate-spin text-neutral-400 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span>Loading users...</span>
+      </div>`;
+  }
+
+  function renderUsersList() {
+    if (!el.usersListContainer) return;
+    if (el.usersCountBadge) el.usersCountBadge.textContent = String(cachedUsers.length);
+
+    if (!cachedUsers.length) {
+      el.usersListContainer.innerHTML = `
+        <div class="py-8 text-center text-xs text-neutral-400">No users found.</div>`;
+      return;
+    }
+
+    el.usersListContainer.innerHTML = cachedUsers.map((u) => {
+      const isCurrent = currentUser && (currentUser.id === u.id || currentUser.username.toLowerCase() === u.username.toLowerCase());
+      const displayName = u.name || u.username;
+
+      return `
+        <button type="button" data-edit-user-id="${u.id}" title="Click to edit user"
+          class="group flex w-full items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-neutral-50/60 px-4 py-2.5 text-left transition-colors hover:border-neutral-300 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-800/40 dark:hover:border-neutral-700 dark:hover:bg-neutral-800">
+          <div class="min-w-0 flex-1 flex items-center gap-1.5 truncate">
+            <span class="truncate text-xs font-bold text-neutral-900 dark:text-white">${escapeHtml(displayName)}</span>
+            <span class="flex-shrink-0 text-xs font-medium text-neutral-400 dark:text-neutral-500">(@${escapeHtml(u.username)})</span>
+          </div>
+          ${isCurrent ? `
+          <svg class="h-4 w-4 flex-shrink-0 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" title="Active Account">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>` : ''}
+        </button>`;
+    }).join('');
+  }
+
+  function openAddUserModal() {
+    if (!el.userForm) return;
+    el.userForm.reset();
+    if (el.userFormId) el.userFormId.value = '';
+    if (el.userFormModalTitle) el.userFormModalTitle.textContent = 'Add User';
+    if (el.userFormPassReqStar) el.userFormPassReqStar.classList.remove('hidden');
+    if (el.userFormPassHint) el.userFormPassHint.classList.add('hidden');
+    if (el.userFormPassword) el.userFormPassword.required = true;
+    if (el.userFormErrorMsg) el.userFormErrorMsg.classList.add('hidden');
+    if (el.permEvents) el.permEvents.checked = true;
+    if (el.permMovies) el.permMovies.checked = true;
+    if (el.permUsers) el.permUsers.checked = false;
+    if (el.deleteUserFromFormBtn) el.deleteUserFromFormBtn.classList.add('hidden');
+    openModal(el.userFormModal);
+  }
+
+  function openEditUserModal(userId) {
+    const u = cachedUsers.find((user) => user.id === userId);
+    if (!u || !el.userForm) return;
+    el.userForm.reset();
+    if (el.userFormId) el.userFormId.value = u.id;
+    if (el.userFormModalTitle) el.userFormModalTitle.textContent = 'Edit User';
+    if (el.userFormUsername) el.userFormUsername.value = u.username;
+    if (el.userFormPassword) el.userFormPassword.required = false;
+    if (el.userFormPassReqStar) el.userFormPassReqStar.classList.add('hidden');
+    if (el.userFormPassHint) el.userFormPassHint.classList.remove('hidden');
+    if (el.userFormName) el.userFormName.value = u.name || '';
+    if (el.userFormSex) el.userFormSex.value = u.sex === 'Her' ? 'Her' : 'Him';
+    if (el.userFormTheme) el.userFormTheme.value = u.theme || 'dark';
+    const perms = u.permissions || {};
+    if (el.permEvents) el.permEvents.checked = Boolean(perms.canManageEvents);
+    if (el.permMovies) el.permMovies.checked = Boolean(perms.canManageMovies);
+    if (el.permUsers) el.permUsers.checked = Boolean(perms.canManageUsers);
+    if (el.userFormErrorMsg) el.userFormErrorMsg.classList.add('hidden');
+
+    const isCurrent = currentUser && (currentUser.id === u.id || currentUser.username.toLowerCase() === u.username.toLowerCase());
+    if (el.deleteUserFromFormBtn) {
+      if (!isCurrent && cachedUsers.length > 1) {
+        el.deleteUserFromFormBtn.classList.remove('hidden');
+      } else {
+        el.deleteUserFromFormBtn.classList.add('hidden');
+      }
+    }
+    openModal(el.userFormModal);
+  }
+
+  async function handleUserFormSubmit(e) {
+    e.preventDefault();
+    const id = el.userFormId ? el.userFormId.value : '';
+    const username = (el.userFormUsername ? el.userFormUsername.value : '').trim().toLowerCase();
+    const pass = (el.userFormPassword ? el.userFormPassword.value : '').trim();
+    const name = (el.userFormName ? el.userFormName.value : '').trim() || username;
+    const sex = el.userFormSex ? el.userFormSex.value : 'Him';
+    const theme = el.userFormTheme ? el.userFormTheme.value : 'dark';
+    const permissions = {
+      canManageEvents: el.permEvents ? el.permEvents.checked : true,
+      canManageMovies: el.permMovies ? el.permMovies.checked : true,
+      canManageUsers: el.permUsers ? el.permUsers.checked : false,
+    };
+
+    if (!username) return;
+    if (!id && !pass) {
+      if (el.userFormErrorMsg) {
+        el.userFormErrorMsg.textContent = 'Password is required for new user.';
+        el.userFormErrorMsg.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const userPayload = { id, username, pass, name, sex, theme, permissions };
+    if (el.saveUserBtn) {
+      el.saveUserBtn.disabled = true;
+      el.saveUserBtn.textContent = 'Saving...';
+    }
+
+    try {
+      let savedViaApi = false;
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'save', user: userPayload }),
+        });
+        const data = await safeJson(res);
+        if (res.ok && data && data.ok) {
+          savedViaApi = true;
+          if (Array.isArray(data.users)) {
+            cachedUsers = data.users;
+            setLocalUsers(cachedUsers);
+          }
+        }
+      } catch (err) {
+        console.warn('API save user error, using local fallback:', err);
+      }
+
+      if (!savedViaApi) {
+        // Local save fallback
+        const local = getLocalUsers();
+        const existingIdx = local.findIndex((u) => u.id === id || u.username.toLowerCase() === username);
+        if (id && existingIdx !== -1) {
+          const existing = local[existingIdx];
+          local[existingIdx] = {
+            ...existing,
+            username,
+            name,
+            sex,
+            theme,
+            pass: pass || existing.pass,
+            permissions,
+          };
+        } else {
+          if (existingIdx !== -1) {
+            throw new Error('Username already taken.');
+          }
+          local.push({
+            id: 'usr_' + Math.random().toString(36).substring(2, 9),
+            username,
+            pass,
+            name,
+            sex,
+            theme,
+            permissions,
+            createdAt: Date.now(),
+          });
+        }
+        setLocalUsers(local);
+        cachedUsers = local.map((u) => ({ ...u, pass: undefined }));
+      }
+
+      // If updating current user's profile
+      if (currentUser && (currentUser.id === id || currentUser.username.toLowerCase() === username)) {
+        currentUser.name = name;
+        currentUser.sex = sex;
+        currentUser.theme = theme;
+        currentUser.permissions = permissions;
+        localStorage.setItem(KEY_AUTH_USER, JSON.stringify(currentUser));
+        renderAuthState();
+      }
+
+      closeModal(el.userFormModal);
+      renderUsersList();
+      toast(id ? 'User updated successfully' : 'User created successfully');
+    } catch (err) {
+      if (el.userFormErrorMsg) {
+        el.userFormErrorMsg.textContent = String(err.message || err);
+        el.userFormErrorMsg.classList.remove('hidden');
+      }
+    } finally {
+      if (el.saveUserBtn) {
+        el.saveUserBtn.disabled = false;
+        el.saveUserBtn.textContent = 'Save User';
+      }
+    }
+  }
+
+  async function handleDeleteUser(userId) {
+    const u = cachedUsers.find((user) => user.id === userId);
+    if (!u) return false;
+
+    if (currentUser && (currentUser.id === userId || currentUser.username.toLowerCase() === u.username.toLowerCase())) {
+      toast('You cannot delete your own active account');
+      return false;
+    }
+
+    if (cachedUsers.length <= 1) {
+      toast('Cannot delete the last user');
+      return false;
+    }
+
+    if (!window.confirm(`Delete user "${u.name || u.username}"?`)) return false;
+
+    try {
+      let deletedViaApi = false;
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', id: userId }),
+        });
+        const data = await safeJson(res);
+        if (res.ok && data && data.ok) {
+          deletedViaApi = true;
+          if (Array.isArray(data.users)) {
+            cachedUsers = data.users;
+            setLocalUsers(cachedUsers);
+          }
+        }
+      } catch (err) {
+        console.warn('API delete user error, using local fallback:', err);
+      }
+
+      if (!deletedViaApi) {
+        const local = getLocalUsers().filter((user) => user.id !== userId);
+        setLocalUsers(local);
+        cachedUsers = local.map((user) => ({ ...user, pass: undefined }));
+      }
+
+      renderUsersList();
+      toast('User deleted');
+      return true;
+    } catch (err) {
+      toast('Error deleting user: ' + err.message);
+      return false;
+    }
+  }
+
   /* ---------- Day modal (one event per date, detail-first) ---------- */
   function eventForDate(key) {
     return events.find((e) => e.date === key) || null;
@@ -1533,10 +2195,27 @@
     renderDay();
     openModal(el.dayModal);
   }
+  function updateDayBookmarkBtn(ev) {
+    const btn = $('bookmarkDayBtn');
+    if (!btn) return;
+    const isBookmarked = !!(ev && ev.bookmarked);
+    btn.dataset.bookmarked = String(isBookmarked);
+    const svg = btn.querySelector('svg');
+    if (isBookmarked) {
+      if (svg) svg.setAttribute('fill', 'currentColor');
+      btn.classList.add('text-neutral-900', 'dark:text-white');
+      btn.classList.remove('text-neutral-400', 'dark:text-neutral-500');
+    } else {
+      if (svg) svg.setAttribute('fill', 'none');
+      btn.classList.remove('text-neutral-900', 'dark:text-white');
+      btn.classList.add('text-neutral-600', 'dark:text-neutral-300');
+    }
+  }
   function renderDay() {
     const ev = eventForDate(selectedDate);
     renderDayBody(ev);
     renderDayFooter(ev);
+    updateDayBookmarkBtn(ev);
   }
 
   function renderDayBody(ev) {
@@ -1632,14 +2311,14 @@
           </div>
         </div>`;
     } else if (isDateUpcoming(ev.date)) {
-      const progPct = getEventCountdownProgress(ev.date, ev.createdAt);
+      const progPct = getEventCountdownProgress(ev.date);
       photoHtml = `
         <div class="flex justify-center">
           <div class="flex aspect-square w-full max-w-[190px] sm:max-w-[210px] flex-col items-center justify-center gap-2.5 sm:gap-3 rounded-2xl border border-dashed border-neutral-300 p-4 text-center dark:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-800/30 shadow-xs">
             <!-- Circular Icon with Progress Ring -->
             <div class="relative flex h-13 w-13 sm:h-15 sm:w-15 items-center justify-center">
-              <!-- SVG Progress Ring (starts at 12 o'clock / top, clockwise) -->
-              <svg class="pointer-events-none absolute inset-0 h-full w-full -rotate-90 transform" viewBox="0 0 44 44">
+              <!-- SVG Progress Ring (shown only in final 1 hour) -->
+              <svg class="pointer-events-none absolute inset-0 h-full w-full -rotate-90 transform ${progPct > 0 ? '' : 'hidden'}" viewBox="0 0 44 44">
                 <!-- Track -->
                 <circle cx="22" cy="22" r="19" fill="none"
                   class="stroke-neutral-200/90 dark:stroke-neutral-700/70" stroke-width="2.5" />
@@ -1708,33 +2387,46 @@
   }
 
   function renderDayFooter(ev) {
-    if (!ev) {
+    const canManage = currentUser && currentUser.permissions && currentUser.permissions.canManageEvents;
+
+    if (!currentUser) {
+      el.dayModalFooter.innerHTML = `
+        <div class="flex w-full items-center justify-between gap-2">
+          <p class="text-[11px] text-neutral-400">Log in to add or edit notes.</p>
+          <button type="button" data-close-modal class="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+            Close
+          </button>
+        </div>`;
+    } else if (!ev) {
       el.dayModalFooter.innerHTML = `
         <div class="flex w-full items-center justify-end gap-2">
           <button type="button" data-close-modal class="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
             Close
           </button>
+          ${canManage ? `
           <button type="button" id="addEventBtn"
             class="tgbls-fill rounded-xl border border-transparent bg-clip-padding bg-neutral-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
             Add Event
-          </button>
+          </button>` : ''}
         </div>`;
     } else {
       el.dayModalFooter.innerHTML = `
         <div class="flex w-full items-center justify-between gap-2">
+          ${canManage ? `
           <button type="button" data-delete="${ev.id}"
             class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-50 dark:hover:bg-red-950/40">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             Delete
-          </button>
+          </button>` : '<div></div>'}
           <div class="flex gap-2">
             <button type="button" data-close-modal class="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
               Close
             </button>
+            ${canManage ? `
             <button type="button" data-edit="${ev.id}"
               class="tgbls-fill rounded-xl border border-transparent bg-clip-padding bg-neutral-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
               Edit
-            </button>
+            </button>` : ''}
           </div>
         </div>`;
     }
@@ -1985,7 +2677,7 @@
   function getLinkedPhotosList() {
     const items = [];
 
-    // From Movies: ticket photos and posters
+    // From Movies: user-uploaded ticket photos (excluding posters)
     movies.forEach((m) => {
       if (m.ticket) {
         items.push({
@@ -1995,16 +2687,6 @@
           title: m.title,
           date: m.date,
           src: m.ticket
-        });
-      }
-      if (m.poster) {
-        items.push({
-          id: `movie-poster-${m.id}`,
-          type: 'movies',
-          typeLabel: 'Poster',
-          title: m.title,
-          date: m.date,
-          src: m.poster
         });
       }
     });
@@ -2078,6 +2760,11 @@
       renderPhotoForm();
     }
 
+    const titleCountEl = $('eventTitleCharCount');
+    if (titleCountEl) {
+      titleCountEl.textContent = `${(el.eventTitle.value || '').length}/50`;
+    }
+
     const charCountEl = $('eventDescCharCount');
     if (charCountEl) {
       charCountEl.textContent = `${(el.eventDesc.value || '').length}/50`;
@@ -2094,7 +2781,7 @@
     e.preventDefault();
 
     try {
-      const title = el.eventTitle.value.trim();
+      const title = el.eventTitle.value.trim().slice(0, 50);
       const date = el.eventDate.value;
       if (!title || !date) return;
 
@@ -2189,35 +2876,82 @@
 
   /* ---------- Event listeners ---------- */
   function bindEvents() {
-    // Profile Dropdown Toggle
+    // Profile Dropdown Toggle with Backdrop Blur
     const profileBtn = $('profileBtn');
     const profileDropdown = $('profileDropdown');
+    const profileBackdrop = $('profileBackdrop');
+
+    function toggleProfileDropdown(force) {
+      if (!profileDropdown) return;
+      const isHidden = profileDropdown.classList.contains('hidden');
+      const willOpen = typeof force === 'boolean' ? force : isHidden;
+      document.documentElement.classList.toggle('is-profile-open', willOpen);
+      if (willOpen) {
+        profileDropdown.classList.remove('hidden');
+        if (profileBackdrop) profileBackdrop.classList.remove('hidden');
+      } else {
+        profileDropdown.classList.add('hidden');
+        if (profileBackdrop) profileBackdrop.classList.add('hidden');
+      }
+    }
+
     if (profileBtn && profileDropdown) {
       profileBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        profileDropdown.classList.toggle('hidden');
+        toggleProfileDropdown();
       });
+
+      if (profileBackdrop) {
+        profileBackdrop.addEventListener('click', () => {
+          toggleProfileDropdown(false);
+        });
+      }
 
       document.addEventListener('click', (e) => {
         if (!profileDropdown.contains(e.target) && !profileBtn.contains(e.target)) {
-          profileDropdown.classList.add('hidden');
+          toggleProfileDropdown(false);
         }
       });
     }
 
     if (el.openLoginModalBtn) {
       el.openLoginModalBtn.addEventListener('click', () => {
-        if (el.profileDropdown) el.profileDropdown.classList.add('hidden');
+        toggleProfileDropdown(false);
         if (el.loginErrorMsg) el.loginErrorMsg.classList.add('hidden');
         if (el.loginForm) el.loginForm.reset();
         openModal(el.loginModal);
       });
     }
     if (el.logoutBtn) {
-      el.logoutBtn.addEventListener('click', handleLogout);
+      el.logoutBtn.addEventListener('click', () => {
+        toggleProfileDropdown(false);
+        handleLogout();
+      });
     }
     if (el.loginForm) {
       el.loginForm.addEventListener('submit', handleLoginSubmit);
+    }
+
+    if (el.openSettingsModalBtn) {
+      el.openSettingsModalBtn.addEventListener('click', () => {
+        toggleProfileDropdown(false);
+        openSettingsModal();
+      });
+    }
+    if (el.openAddUserBtn) {
+      el.openAddUserBtn.addEventListener('click', openAddUserModal);
+    }
+    if (el.userForm) {
+      el.userForm.addEventListener('submit', handleUserFormSubmit);
+    }
+    if (el.deleteUserFromFormBtn) {
+      el.deleteUserFromFormBtn.addEventListener('click', async () => {
+        const id = el.userFormId ? el.userFormId.value : '';
+        if (id) {
+          const deleted = await handleDeleteUser(id);
+          if (deleted) closeModal(el.userFormModal);
+        }
+      });
     }
 
     if (el.themeToggleBtn) {
@@ -2244,6 +2978,37 @@
     if (el.deleteSelectedMoviesBtn) el.deleteSelectedMoviesBtn.addEventListener('click', handleDeleteSelectedMovies);
     if (el.cancelMovieSelectBtn) el.cancelMovieSelectBtn.addEventListener('click', () => setMovieSelectMode(false));
     if (el.openMovieSearchBtn) el.openMovieSearchBtn.addEventListener('click', () => toggleWatchedMovieSearch());
+
+    // Mobile Actions Menu listeners
+    if (el.movieMobileActionsBtn) {
+      el.movieMobileActionsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (el.movieMobileActionsMenu) {
+          el.movieMobileActionsMenu.classList.toggle('hidden');
+        }
+      });
+    }
+    if (el.movieMobileSearchCloseBtn) {
+      el.movieMobileSearchCloseBtn.addEventListener('click', () => toggleWatchedMovieSearch(false));
+    }
+    if (el.mobileAddMovieBtn) {
+      el.mobileAddMovieBtn.addEventListener('click', () => {
+        if (el.movieMobileActionsMenu) el.movieMobileActionsMenu.classList.add('hidden');
+        openAddMovie();
+      });
+    }
+    if (el.mobileSearchMovieBtn) {
+      el.mobileSearchMovieBtn.addEventListener('click', () => {
+        if (el.movieMobileActionsMenu) el.movieMobileActionsMenu.classList.add('hidden');
+        toggleWatchedMovieSearch(true);
+      });
+    }
+    if (el.mobileSelectMovieBtn) {
+      el.mobileSelectMovieBtn.addEventListener('click', () => {
+        if (el.movieMobileActionsMenu) el.movieMobileActionsMenu.classList.add('hidden');
+        setMovieSelectMode(true);
+      });
+    }
     if (el.watchedMovieSearchInput) {
       el.watchedMovieSearchInput.addEventListener('input', (e) => {
         watchedMovieQuery = (e.target.value || '').trim().toLowerCase();
@@ -2344,7 +3109,7 @@
         if (movie) {
           const savedRate = (movie.rating && parseFloat(movie.rating) > 0) ? parseFloat(movie.rating) : 0;
           if (el.movieRatingSlider) el.movieRatingSlider.value = savedRate;
-          if (el.detailRatingInput) el.detailRatingInput.value = movie.rating || '';
+          setDetailRatingDisplay(movie.rating);
         }
         setRatingEditMode(false);
       });
@@ -2354,15 +3119,20 @@
     }
 
     // Movie Ticket Photo handlers
+    const handleTicketAction = () => {
+      if (isMovieDetailEditing || !activeTicketPhoto) {
+        if (el.movieTicketInput) el.movieTicketInput.click();
+      } else {
+        if (el.lightboxImage) el.lightboxImage.src = activeTicketPhoto;
+        if (el.imageLightboxModal) openModal(el.imageLightboxModal);
+      }
+    };
+
     if (el.movieTicketBox) {
-      el.movieTicketBox.addEventListener('click', () => {
-        if (isMovieDetailEditing || !activeTicketPhoto) {
-          if (el.movieTicketInput) el.movieTicketInput.click();
-        } else {
-          if (el.lightboxImage) el.lightboxImage.src = activeTicketPhoto;
-          if (el.imageLightboxModal) openModal(el.imageLightboxModal);
-        }
-      });
+      el.movieTicketBox.addEventListener('click', handleTicketAction);
+    }
+    if (el.movieShowTicketMobileBtn) {
+      el.movieShowTicketMobileBtn.addEventListener('click', handleTicketAction);
     }
     if (el.movieTicketInput) {
       el.movieTicketInput.addEventListener('change', async (e) => {
@@ -2405,6 +3175,14 @@
       });
     }
 
+    if (el.eventTitle) {
+      el.eventTitle.addEventListener('input', () => {
+        const count = (el.eventTitle.value || '').length;
+        const counter = $('eventTitleCharCount');
+        if (counter) counter.textContent = `${count}/50`;
+      });
+    }
+
     if (el.eventDesc) {
       el.eventDesc.addEventListener('input', () => {
         const count = (el.eventDesc.value || '').length;
@@ -2436,34 +3214,38 @@
       }
     };
 
-    const toggleBookmarkIcon = (btn) => {
-      if (!btn) return;
-      const svg = btn.querySelector('svg');
-      const isBookmarked = btn.dataset.bookmarked === 'true';
-      if (isBookmarked) {
-        btn.dataset.bookmarked = 'false';
-        if (svg) svg.setAttribute('fill', 'none');
-        btn.classList.remove('text-amber-500', 'border-amber-400/50', 'bg-amber-50/60', 'dark:bg-amber-950/30', 'dark:border-amber-600/40');
-      } else {
-        btn.dataset.bookmarked = 'true';
-        if (svg) svg.setAttribute('fill', 'currentColor');
-        btn.classList.add('text-amber-500', 'border-amber-400/50', 'bg-amber-50/60', 'dark:bg-amber-950/30', 'dark:border-amber-600/40');
-      }
-    };
-
     const bookmarkDayBtn = $('bookmarkDayBtn');
     if (bookmarkDayBtn) {
-      bookmarkDayBtn.addEventListener('click', () => toggleBookmarkIcon(bookmarkDayBtn));
-    }
-    const shareDayBtn = $('shareDayBtn');
-    if (shareDayBtn) {
-      shareDayBtn.addEventListener('click', () => {
+      bookmarkDayBtn.addEventListener('click', () => {
         const ev = eventForDate(selectedDate);
-        if (ev) {
-          handleShareEvent(ev.title, ev.date, ev.desc);
-        } else {
-          handleShareEvent(el.dayModalTitle ? el.dayModalTitle.textContent : 'Event', selectedDate, '');
+        if (!ev) return;
+        ev.bookmarked = !ev.bookmarked;
+        saveEvents();
+        updateDayBookmarkBtn(ev);
+        renderBookmarksList();
+        toast(ev.bookmarked ? 'Added to bookmarks' : 'Removed from bookmarks');
+      });
+    }
+
+    // Day Header Add Dropdown Handlers
+    if (el.dayAddDropdownBtn) {
+      el.dayAddDropdownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (el.dayAddDropdownMenu) {
+          el.dayAddDropdownMenu.classList.toggle('hidden');
         }
+      });
+    }
+    if (el.dayAddMovieOptionBtn) {
+      el.dayAddMovieOptionBtn.addEventListener('click', () => {
+        if (el.dayAddDropdownMenu) el.dayAddDropdownMenu.classList.add('hidden');
+        openAddMovie(selectedDate);
+      });
+    }
+    if (el.dayAddFoodOptionBtn) {
+      el.dayAddFoodOptionBtn.addEventListener('click', () => {
+        if (el.dayAddDropdownMenu) el.dayAddDropdownMenu.classList.add('hidden');
+        toast('Food tracking feature is in progress');
       });
     }
     if (el.eventPhotoInput) el.eventPhotoInput.addEventListener('change', async (e) => {
@@ -2629,6 +3411,16 @@
 
     // klik global (delegation)
     document.addEventListener('click', (e) => {
+      // close day add dropdown when clicking outside
+      if (!e.target.closest('#dayAddMenuWrap')) {
+        if (el.dayAddDropdownMenu) el.dayAddDropdownMenu.classList.add('hidden');
+      }
+
+      // close movie mobile actions dropdown when clicking outside
+      if (!e.target.closest('#movieMobileActionsWrap')) {
+        if (el.movieMobileActionsMenu) el.movieMobileActionsMenu.classList.add('hidden');
+      }
+
       const moviePrev = e.target.closest('[data-movie-prev]');
       if (moviePrev) {
         if (moviesPage > 0) {
@@ -2645,6 +3437,18 @@
           moviesPage++;
           renderMoviesGrid();
         }
+        return;
+      }
+
+      const editUserBtn = e.target.closest('[data-edit-user-id]');
+      if (editUserBtn) {
+        openEditUserModal(editUserBtn.dataset.editUserId);
+        return;
+      }
+
+      const deleteUserBtn = e.target.closest('[data-delete-user-id]');
+      if (deleteUserBtn) {
+        handleDeleteUser(deleteUserBtn.dataset.deleteUserId);
         return;
       }
 
@@ -2701,6 +3505,36 @@
         if (el.detailPhotoInput) {
           el.detailPhotoInput.value = '';
           el.detailPhotoInput.click();
+        }
+        return;
+      }
+
+      const bookmarkOpenBtn = e.target.closest('#openBookmarksBtn');
+      if (bookmarkOpenBtn) {
+        openBookmarksModal();
+        return;
+      }
+
+      const openBookmarkItem = e.target.closest('[data-open-bookmark-date]');
+      if (openBookmarkItem) {
+        const date = openBookmarkItem.dataset.openBookmarkDate;
+        closeModal(el.bookmarksModal);
+        openDay(date);
+        return;
+      }
+
+      const unbookmarkBtn = e.target.closest('[data-unbookmark-date]');
+      if (unbookmarkBtn) {
+        const date = unbookmarkBtn.dataset.unbookmarkDate;
+        const ev = eventForDate(date);
+        if (ev) {
+          ev.bookmarked = false;
+          saveEvents();
+          renderBookmarksList();
+          if (selectedDate === date && el.dayModal && !el.dayModal.classList.contains('hidden')) {
+            updateDayBookmarkBtn(ev);
+          }
+          toast('Removed from bookmarks');
         }
         return;
       }

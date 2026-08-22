@@ -36,7 +36,7 @@
   <header class="sticky top-0 z-30 border-b border-neutral-200 bg-neutral-50/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/80">
     <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
       <!-- Brand -->
-      <div class="flex items-center">
+      <div id="headerBrand" class="flex items-center">
         <h1 class="text-base font-bold tracking-tight sm:text-lg">tgbls*</h1>
       </div>
 
@@ -61,9 +61,12 @@
 
       <!-- Actions: Profile with Dropdown Menu -->
       <div class="relative flex items-center">
+        <!-- Backdrop overlay when profile dropdown is open -->
+        <div id="profileBackdrop" class="fixed inset-0 bg-neutral-900/20 backdrop-blur-sm dark:bg-black/40 z-40 hidden animate-fade-in"></div>
+
         <!-- Profile Button -->
         <button id="profileBtn" type="button" title="Profile & Settings"
-          class="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-neutral-200 bg-transparent text-neutral-700 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800 focus:outline-none active:scale-95">
+          class="relative z-50 inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-neutral-200 bg-transparent text-neutral-700 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800 focus:outline-none active:scale-95">
           <svg class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
           </svg>
@@ -71,18 +74,18 @@
 
         <!-- Profile Dropdown Menu -->
         <div id="profileDropdown"
-          class="hidden absolute right-0 top-full mt-2 w-52 origin-top-right rounded-2xl border border-neutral-200 bg-white p-2 shadow-xl dark:border-neutral-800 dark:bg-neutral-900 animate-pop-in z-50">
+          class="hidden absolute right-0 top-full mt-2 w-52 origin-top-right rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900 animate-pop-in z-50">
           
           <div id="profileHeaderInfo" class="hidden px-3 py-2 border-b border-neutral-100 dark:border-neutral-800/80 mb-1">
-            <p id="profileOwnerName" class="text-xs font-bold text-neutral-900 dark:text-white">—</p>
-            <p id="profileOwnerRole" class="text-[11px] text-neutral-500 dark:text-neutral-400">—</p>
+            <p id="profileOwnerName" class="text-xs font-bold text-neutral-900 dark:text-white leading-tight">—</p>
+            <p id="profileOwnerRole" class="text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight mt-0.5">—</p>
           </div>
 
           <!-- Theme Toggle Button inside Dropdown -->
           <button id="themeToggleBtn" type="button"
-            class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+            class="flex w-full items-center justify-between gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
             <div class="flex items-center gap-2.5">
-              <span id="themeToggleIcon" class="flex items-center justify-center"></span>
+              <span id="themeToggleIcon" class="flex h-4 w-4 items-center justify-center text-neutral-500"></span>
               <span id="themeLabelText">Dark Mode</span>
             </div>
             
@@ -94,24 +97,34 @@
             </div>
           </button>
 
+          <!-- User Settings Button (Visible when logged in with permission) -->
+          <button id="openSettingsModalBtn" type="button"
+            class="hidden w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+            <svg class="h-4 w-4 flex-shrink-0 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span class="text-left flex-1">User Settings</span>
+          </button>
+
           <div id="themeDivider" class="my-1 border-t border-neutral-100 dark:border-neutral-800/80"></div>
 
           <!-- Login Button (Visible when logged out) -->
           <button id="openLoginModalBtn" type="button"
-            class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
-            <svg class="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+            <svg class="h-4 w-4 flex-shrink-0 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H3" />
             </svg>
-            <span>Log In</span>
+            <span class="text-left flex-1">Log In</span>
           </button>
 
           <!-- Logout Button (Visible when logged in) -->
           <button id="logoutBtn" type="button"
-            class="hidden w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-50 dark:hover:bg-red-950/40">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            class="hidden w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold text-red-500 transition hover:bg-red-50 dark:hover:bg-red-950/40">
+            <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
             </svg>
-            <span>Log Out</span>
+            <span class="text-left flex-1">Log Out</span>
           </button>
         </div>
       </div>
@@ -209,26 +222,60 @@
                 </button>
               </div>
 
-              <!-- Add Movie Button (+) -->
-              <button type="button" id="openAddMovieBtn" title="Add Movie"
-                class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 text-neutral-800 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-800">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M12 5v14M5 12h14" /></svg>
-              </button>
+              <!-- Desktop Controls: Add Movie, Search, Select (Order: Add -> Search -> Select) -->
+              <div id="moviesDesktopControls" class="hidden sm:flex items-center gap-1.5">
+                <button type="button" id="openAddMovieBtn" title="Add Movie"
+                  class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 text-neutral-800 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M12 5v14M5 12h14" /></svg>
+                </button>
 
-              <!-- Select Mode Toggle Button (Icon only, circle) -->
-              <button type="button" id="toggleMovieSelectBtn" title="Select movies"
-                class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-                </svg>
-              </button>
+                <button type="button" id="openMovieSearchBtn" title="Search Watched Movies"
+                  class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+                  <svg id="movieSearchIconSvg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  <svg id="movieSearchCloseSvg" class="hidden h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
+                </button>
 
-              <!-- Search Toggle Button (🔍 / Back Arrow) -->
-              <button type="button" id="openMovieSearchBtn" title="Search Watched Movies"
-                class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
-                <svg id="movieSearchIconSvg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                <svg id="movieSearchCloseSvg" class="hidden h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
-              </button>
+                <button type="button" id="toggleMovieSelectBtn" title="Select movies"
+                  class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Mobile Actions Dropdown Menu (Visible only on mobile) -->
+              <div class="relative sm:hidden" id="movieMobileActionsWrap">
+                <button type="button" id="movieMobileSearchCloseBtn" class="hidden h-9 w-9 items-center justify-center rounded-full border border-neutral-200 transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800" title="Close search">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
+                </button>
+                <button type="button" id="movieMobileActionsBtn" title="Options"
+                  class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
+                  </svg>
+                </button>
+
+                <div id="movieMobileActionsMenu"
+                  class="hidden absolute right-0 top-full mt-1.5 w-36 overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl transition-all duration-150 animate-pop-in z-30 dark:border-neutral-800 dark:bg-neutral-900">
+                  <button type="button" id="mobileAddMovieBtn"
+                    class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                    <svg class="h-4 w-4 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M12 5v14M5 12h14" /></svg>
+                    <span>Add Movie</span>
+                  </button>
+                  <button type="button" id="mobileSearchMovieBtn"
+                    class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                    <svg class="h-4 w-4 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    <span>Search</span>
+                  </button>
+                  <button type="button" id="mobileSelectMovieBtn"
+                    class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                    <svg class="h-4 w-4 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                    </svg>
+                    <span>Select</span>
+                  </button>
+                </div>
+              </div>
 
               <!-- Pager (< >) -->
               <div id="moviesPager" class="flex items-center gap-1.5"></div>
@@ -272,9 +319,11 @@
         <div id="statsCard" class="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:p-5">
           <div class="mb-3 flex items-center justify-between gap-2">
             <h3 class="text-base font-bold tracking-tight">This Year's Stats</h3>
-            <button id="openReceiptBtn" type="button" title="Share stats"
-              class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800">
-              <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15M12 3v13.5m0-13.5L8.25 6.75M12 3l3.75 3.75" /></svg>
+            <button id="openBookmarksBtn" type="button" title="Bookmarks"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white">
+              <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+              </svg>
             </button>
           </div>
           <div class="space-y-2.5">
@@ -284,13 +333,15 @@
         </div>
 
         <!-- Latest Events card -->
-        <div id="upcomingEventsCard" class="flex min-h-0 flex-1 flex-col rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:p-6">
-          <div class="mb-4 flex items-center justify-between">
-            <h3 class="text-base font-bold tracking-tight">Latest Events</h3>
-            <span id="upcomingCount" class="rounded-full bg-neutral-100 px-3.5 py-0.5 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">0</span>
+        <div id="upcomingEventsCard" class="flex flex-1 flex-col justify-between rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:p-6">
+          <div>
+            <div class="mb-4 flex items-center justify-between">
+              <h3 class="text-base font-bold tracking-tight">Latest Events</h3>
+              <span id="upcomingCount" class="rounded-full bg-neutral-100 px-3.5 py-0.5 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">0</span>
+            </div>
+            <div id="upcomingList" class="space-y-2"></div>
           </div>
-          <div id="upcomingList" class="space-y-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1"></div>
-          <div id="upcomingPager" class="mt-3 hidden items-center justify-between gap-2"></div>
+          <div id="upcomingPager" class="mt-4 hidden items-center justify-between gap-2"></div>
         </div>
 
       </aside>
@@ -306,8 +357,8 @@
   <div id="dayModal" class="modal-root fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div class="modal-backdrop absolute inset-0 bg-neutral-900/40 backdrop-blur-sm dark:bg-black/60 animate-fade-in"></div>
     <div class="relative z-10 flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-900 animate-pop-in overflow-hidden">
-      <div class="flex flex-shrink-0 items-center justify-between gap-3 border-b border-neutral-200 p-5 dark:border-neutral-800">
-        <h3 id="dayModalTitle" class="truncate text-lg font-bold">—</h3>
+      <div class="flex flex-shrink-0 items-center justify-between gap-3 border-b border-neutral-200 px-5 pt-5 pb-3 dark:border-neutral-800">
+        <h3 id="dayModalTitle" class="truncate text-base font-bold">—</h3>
         <div class="flex items-center gap-1.5 flex-shrink-0">
           <button type="button" id="bookmarkDayBtn" title="Bookmark event"
             class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800">
@@ -315,12 +366,35 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
             </svg>
           </button>
-          <button type="button" id="shareDayBtn" title="Share event"
-            class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15M12 3v13.5m0-13.5L8.25 6.75M12 3l3.75 3.75" />
-            </svg>
-          </button>
+
+          <!-- Add Button & Dropdown Menu -->
+          <div class="relative" id="dayAddMenuWrap">
+            <button type="button" id="dayAddDropdownBtn" title="Add items to this date"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </button>
+
+            <!-- Dropdown Menu -->
+            <div id="dayAddDropdownMenu"
+              class="hidden absolute right-0 top-full mt-1.5 w-36 overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl transition-all duration-150 animate-pop-in z-30 dark:border-neutral-800 dark:bg-neutral-900">
+              <button type="button" id="dayAddMovieOptionBtn"
+                class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                <svg class="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                </svg>
+                <span>Add Movie</span>
+              </button>
+              <button type="button" id="dayAddFoodOptionBtn"
+                class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                <svg class="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                </svg>
+                <span>Add Food</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -333,12 +407,39 @@
     </div>
   </div>
 
+  <!-- ===== Bookmarks Modal ===== -->
+  <div id="bookmarksModal" class="modal-root fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="modal-backdrop absolute inset-0 bg-neutral-900/40 backdrop-blur-sm dark:bg-black/60 animate-fade-in" data-close-modal></div>
+    <div class="relative z-10 flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-900 animate-pop-in overflow-hidden">
+      <!-- Header -->
+      <div class="flex flex-shrink-0 border-b border-neutral-200 px-5 pt-5 pb-3 dark:border-neutral-800">
+        <div class="flex items-center gap-2">
+          <h3 class="text-base font-bold">Bookmarks</h3>
+          <span id="bookmarksCountBadge" class="rounded-full bg-neutral-100 px-2.5 py-0.5 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">0</span>
+        </div>
+      </div>
+
+      <!-- List Container -->
+      <div id="bookmarksList" class="flex-1 space-y-2 overflow-y-auto px-5 py-4 min-h-0">
+        <!-- filled by JS -->
+      </div>
+
+      <!-- Locked Footer -->
+      <div class="flex-shrink-0 flex justify-end gap-2 border-t border-neutral-100 px-5 py-3.5 dark:border-neutral-800/80 bg-white dark:bg-neutral-900">
+        <button type="button" data-close-modal
+          class="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== Event Form Modal ===== -->
   <div id="eventModal" class="modal-root fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div class="modal-backdrop absolute inset-0 bg-neutral-900/40 backdrop-blur-sm dark:bg-black/60 animate-fade-in"></div>
     <div class="relative z-10 flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-900 animate-pop-in overflow-hidden">
       <div class="flex-shrink-0 border-b border-neutral-200 px-5 pt-5 pb-3 dark:border-neutral-800">
-        <h3 id="eventModalTitle" class="text-lg font-bold">Add Event</h3>
+        <h3 id="eventModalTitle" class="text-base font-bold">Add Event</h3>
       </div>
 
       <form id="eventForm" class="flex flex-1 flex-col overflow-hidden min-h-0">
@@ -346,8 +447,11 @@
 
         <div class="flex-1 space-y-4 overflow-y-auto px-5 py-4 min-h-0">
           <div>
-            <label for="eventTitle" class="mb-1.5 block text-sm font-medium">Event Title <span class="text-neutral-400">*</span></label>
-            <input id="eventTitle" type="text" required maxlength="80"
+            <div class="mb-1.5 flex items-center justify-between">
+              <label for="eventTitle" class="block text-sm font-medium">Event Title <span class="text-neutral-400">*</span></label>
+              <span id="eventTitleCharCount" class="text-[11px] font-medium text-neutral-400 dark:text-neutral-500">0/50</span>
+            </div>
+            <input id="eventTitle" type="text" required maxlength="50"
               class="w-full rounded-xl border border-neutral-200 bg-transparent px-4 py-2.5 text-sm transition focus:border-neutral-400 focus:outline-none focus:ring-0 dark:border-neutral-800 dark:focus:border-neutral-700" />
           </div>
 
@@ -528,18 +632,14 @@
             <div>
               <label class="mb-1 block text-xs font-semibold text-neutral-500 dark:text-neutral-400">Rating</label>
 
-              <!-- View Mode: Display Box + Edit Button -->
-              <div id="ratingViewMode" class="flex h-9 items-center gap-2">
+              <!-- View Mode: Display Box -->
+              <div id="ratingViewMode" class="flex h-9 items-center">
                 <div class="flex h-9 items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50/50 px-2.5 transition dark:border-neutral-800 dark:bg-neutral-800/30">
                   <svg class="h-3.5 w-3.5 fill-amber-400 text-amber-400 flex-shrink-0" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                  <input type="text" id="detailRatingInput" readonly placeholder="—"
-                    class="w-7 bg-transparent p-0 text-left text-sm font-bold text-neutral-900 tabular-nums select-none focus:outline-none dark:text-white" />
+                  <p class="flex items-baseline text-sm font-bold text-neutral-900 dark:text-white leading-none">
+                    <span id="detailRatingInput" class="tabular-nums">—</span><span class="text-xs font-semibold text-neutral-400 dark:text-neutral-500">/10</span>
+                  </p>
                 </div>
-
-                <button type="button" id="editMovieRatingBtn" title="Edit rating"
-                  class="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 text-neutral-700 transition hover:bg-neutral-100 active:scale-95 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-800">
-                  <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                </button>
               </div>
 
               <!-- Edit Mode: Compact Slider with Value right on the thumb, Stop Points (0, 5, 10), and Close 'X' Button -->
@@ -563,26 +663,37 @@
                   </div>
                 </div>
 
-                <!-- Close / 'X' Button on Right of Slider (Same h-9 w-9 size as edit button) -->
+                <!-- Close / 'X' Button on Right of Slider (with spacing from slider) -->
                 <button type="button" id="closeRatingEditBtn" title="Cancel"
-                  class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 active:scale-95 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white">
+                  class="ml-3.5 sm:ml-4 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-neutral-200 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 active:scale-95 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white">
                   <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
               </div>
             </div>
 
-            <!-- Ticket / Memory Photo (1:1 Square Box) -->
+            <!-- Ticket / Memory Photo (Mobile Button / Desktop 1:1 Square Box) -->
             <div>
               <label class="mb-1 block text-xs font-semibold text-neutral-500 dark:text-neutral-400">Ticket</label>
 
               <input type="file" id="movieTicketInput" accept="image/*" class="hidden" />
 
-              <!-- 1:1 Square Preview / Upload Box -->
+              <!-- Mobile View: Compact "Show Ticket" / "Upload Ticket" Button -->
+              <div class="sm:hidden">
+                <button type="button" id="movieShowTicketMobileBtn"
+                  class="flex h-9 items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50/50 px-3 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-neutral-50/50 dark:border-neutral-800 dark:bg-neutral-800/40 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                  <svg class="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                  </svg>
+                  <span id="movieShowTicketMobileText">Show Ticket</span>
+                </button>
+              </div>
+
+              <!-- Desktop View (sm:block): Compact 1:1 Square Preview / Upload Box -->
               <div id="movieTicketBox"
-                class="group relative aspect-square w-14 sm:w-16 cursor-pointer overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 transition hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800/40 dark:hover:border-neutral-600 dark:hover:bg-neutral-800">
+                class="hidden sm:block group relative aspect-square w-11 sm:w-12 cursor-pointer overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 transition hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800/40 dark:hover:border-neutral-600 dark:hover:bg-neutral-800">
                 <!-- Empty state: Upload icon only -->
                 <div id="movieTicketEmptyState" class="flex h-full w-full items-center justify-center select-none">
-                  <svg class="h-5 w-5 text-neutral-400 group-hover:scale-110 transition-transform dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <svg class="h-4 w-4 text-neutral-400 group-hover:scale-110 transition-transform dark:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                   </svg>
                 </div>
@@ -590,12 +701,12 @@
                 <!-- Filled state: 1:1 Image -->
                 <img id="movieTicketPreview" src="" alt="Ticket preview" class="hidden h-full w-full object-cover" />
                 <!-- Edit mode hover: "Change" -->
-                <div id="movieTicketOverlay" class="hidden absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[9px] font-semibold">
+                <div id="movieTicketOverlay" class="hidden absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[8px] font-semibold">
                   Change
                 </div>
                 <!-- View mode hover: Magnifier icon -->
                 <div id="movieTicketZoomOverlay" class="hidden absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                  <svg class="h-4 w-4 drop-shadow group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <svg class="h-3.5 w-3.5 drop-shadow group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
                   </svg>
                 </div>
@@ -617,8 +728,11 @@
           <button type="button" data-close-modal class="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
             Close
           </button>
+          <button type="button" id="editMovieRatingBtn" class="tgbls-fill rounded-xl border border-transparent bg-clip-padding bg-neutral-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+            Edit
+          </button>
           <button type="button" id="saveMovieRatingBtn" class="hidden tgbls-fill rounded-xl border border-transparent bg-clip-padding bg-neutral-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
-            Confirm
+            Save
           </button>
         </div>
       </div>
@@ -689,6 +803,142 @@
             class="tgbls-fill rounded-xl border border-transparent bg-clip-padding bg-neutral-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
             Log In
           </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== User Settings Modal ===== -->
+  <div id="settingsModal" class="modal-root fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="modal-backdrop absolute inset-0 bg-neutral-900/40 backdrop-blur-sm dark:bg-black/60 animate-fade-in" data-close-modal></div>
+    <div class="relative z-10 flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-900 overflow-hidden">
+      <!-- Header -->
+      <div class="flex-shrink-0 flex items-center justify-between border-b border-neutral-200 px-5 pt-5 pb-3 dark:border-neutral-800">
+        <div class="flex items-center gap-2">
+          <h3 class="text-base font-bold">User Settings</h3>
+          <span id="usersCountBadge" class="rounded-full bg-neutral-100 px-2.5 py-0.5 text-[11px] font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">0</span>
+        </div>
+        <button type="button" id="openAddUserBtn"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-800 transition hover:bg-neutral-100 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-800">
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          <span>Add User</span>
+        </button>
+      </div>
+
+      <!-- Users Vertical List -->
+      <div id="usersListContainer" class="flex-1 space-y-2 overflow-y-auto px-5 py-4 min-h-0">
+        <!-- Filled by JS -->
+      </div>
+
+      <!-- Locked Footer -->
+      <div class="flex-shrink-0 flex justify-end gap-2 border-t border-neutral-100 px-5 py-3.5 dark:border-neutral-800/80 bg-white dark:bg-neutral-900">
+        <button type="button" data-close-modal
+          class="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Add / Edit User Form Modal ===== -->
+  <div id="userFormModal" class="modal-root fixed inset-0 z-[55] hidden items-center justify-center p-4">
+    <div class="modal-backdrop absolute inset-0 bg-neutral-900/40 backdrop-blur-sm dark:bg-black/60 animate-fade-in" data-close-modal></div>
+    <div class="relative z-10 flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-900 overflow-hidden">
+      <!-- Header -->
+      <div class="flex-shrink-0 border-b border-neutral-200 px-5 pt-5 pb-3 dark:border-neutral-800">
+        <h3 id="userFormModalTitle" class="text-base font-bold">Add User</h3>
+      </div>
+
+      <!-- Form Body -->
+      <form id="userForm" class="flex flex-1 flex-col overflow-hidden min-h-0">
+        <input type="hidden" id="userFormId" />
+
+        <div class="flex-1 space-y-3.5 overflow-y-auto px-5 py-4 min-h-0">
+          <div>
+            <label for="userFormUsername" class="mb-1 block text-xs font-semibold text-neutral-600 dark:text-neutral-300">Username <span class="text-neutral-400">*</span></label>
+            <input type="text" id="userFormUsername" required autocomplete="off"
+              class="w-full rounded-xl border border-neutral-200 bg-transparent px-3.5 py-2 text-xs transition focus:border-neutral-400 focus:outline-none focus:ring-0 dark:border-neutral-800 dark:focus:border-neutral-700" />
+          </div>
+
+          <div>
+            <label for="userFormPassword" class="mb-1 block text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+              Password <span id="userFormPassReqStar" class="text-neutral-400">*</span>
+            </label>
+            <input type="password" id="userFormPassword" autocomplete="new-password"
+              class="w-full rounded-xl border border-neutral-200 bg-transparent px-3.5 py-2 text-xs transition focus:border-neutral-400 focus:outline-none focus:ring-0 dark:border-neutral-800 dark:focus:border-neutral-700" />
+            <p id="userFormPassHint" class="mt-1 hidden text-[11px] text-neutral-400">Leave blank to keep existing password.</p>
+          </div>
+
+          <div>
+            <label for="userFormName" class="mb-1 block text-xs font-semibold text-neutral-600 dark:text-neutral-300">Display Name</label>
+            <input type="text" id="userFormName"
+              class="w-full rounded-xl border border-neutral-200 bg-transparent px-3.5 py-2 text-xs transition focus:border-neutral-400 focus:outline-none focus:ring-0 dark:border-neutral-800 dark:focus:border-neutral-700" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="userFormSex" class="mb-1 block text-xs font-semibold text-neutral-600 dark:text-neutral-300">Pronoun / Sex</label>
+              <select id="userFormSex"
+                class="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-medium transition focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200">
+                <option value="Him">Him</option>
+                <option value="Her">Her</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="userFormTheme" class="mb-1 block text-xs font-semibold text-neutral-600 dark:text-neutral-300">Default Theme</label>
+              <select id="userFormTheme"
+                class="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-medium transition focus:border-neutral-400 focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200">
+                <option value="dark">Dark</option>
+                <option value="pink">Pink</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Permissions Block -->
+          <div class="rounded-xl border border-neutral-200 p-3.5 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-800/30 space-y-2.5">
+            <p class="text-xs font-bold text-neutral-800 dark:text-neutral-200">Permissions</p>
+
+            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" id="permEvents" class="h-4 w-4 rounded border-neutral-300 accent-neutral-900 dark:accent-white" />
+              <span class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Can Manage Events</span>
+            </label>
+
+            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" id="permMovies" class="h-4 w-4 rounded border-neutral-300 accent-neutral-900 dark:accent-white" />
+              <span class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Can Manage Movies</span>
+            </label>
+
+            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" id="permUsers" class="h-4 w-4 rounded border-neutral-300 accent-neutral-900 dark:accent-white" />
+              <span class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Can Manage Users (Settings)</span>
+            </label>
+          </div>
+
+          <div id="userFormErrorMsg" class="hidden text-xs text-red-500 font-medium"></div>
+        </div>
+
+        <!-- Locked Footer Buttons -->
+        <div class="flex-shrink-0 flex items-center justify-between gap-2 border-t border-neutral-100 px-5 py-3.5 dark:border-neutral-800/80 bg-white dark:bg-neutral-900">
+          <button type="button" id="deleteUserFromFormBtn"
+            class="hidden inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-50 dark:hover:bg-red-950/40">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Delete</span>
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" data-close-modal
+              class="rounded-xl border border-neutral-200 px-4 py-2 text-xs font-semibold transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800">
+              Cancel
+            </button>
+            <button type="submit" id="saveUserBtn"
+              class="tgbls-fill rounded-xl border border-transparent bg-clip-padding bg-neutral-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200">
+              Save User
+            </button>
+          </div>
         </div>
       </form>
     </div>

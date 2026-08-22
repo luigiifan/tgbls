@@ -36,8 +36,14 @@ async function sbGet() {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
   if (!r.ok) throw new Error('Supabase GET failed: ' + r.status);
-  const rows = await r.json();
-  return rows[0] ? rows[0].data : null;
+  const text = await r.text();
+  if (!text || !text.trim()) return null;
+  try {
+    const rows = JSON.parse(text);
+    return rows[0] ? rows[0].data : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 async function sbUpsert(data) {
@@ -80,10 +86,12 @@ module.exports = async (req, res) => {
 
     if (req.method === 'POST') {
       const body = await readBody(req);
+      const existingState = (await sbGet()) || {};
       const data = {
-        events: Array.isArray(body.events) ? body.events : [],
-        tags: Array.isArray(body.tags) ? body.tags : [],
-        movies: Array.isArray(body.movies) ? body.movies : [],
+        events: Array.isArray(body.events) ? body.events : (existingState.events || []),
+        tags: Array.isArray(body.tags) ? body.tags : (existingState.tags || []),
+        movies: Array.isArray(body.movies) ? body.movies : (existingState.movies || []),
+        users: Array.isArray(existingState.users) ? existingState.users : [],
         updatedAt: Date.now(),
       };
       await sbUpsert(data);
