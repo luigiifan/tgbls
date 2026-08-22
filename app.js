@@ -309,26 +309,28 @@
         return internalIso || '';
       },
       set(val) {
-        if (!val) {
+        if (!val || typeof val !== 'string') {
           internalIso = '';
           valueProp.set.call(textEl, '');
           if (nativeEl) nativeEl.value = '';
           return;
         }
-        if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-          internalIso = val;
-          const dmy = isoToDmy(val);
+        const strVal = String(val).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(strVal)) {
+          internalIso = strVal;
+          const dmy = isoToDmy(strVal);
           valueProp.set.call(textEl, dmy);
-          if (nativeEl) nativeEl.value = val;
-        } else if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(val)) {
-          const iso = dmyToIso(val);
+          if (nativeEl) nativeEl.value = strVal;
+        } else if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(strVal)) {
+          const iso = dmyToIso(strVal);
           internalIso = iso || '';
-          const dmy = iso ? isoToDmy(iso) : val;
+          const dmy = iso ? isoToDmy(iso) : strVal;
           valueProp.set.call(textEl, dmy);
           if (nativeEl && iso) nativeEl.value = iso;
         } else {
-          internalIso = val;
-          valueProp.set.call(textEl, val);
+          internalIso = '';
+          valueProp.set.call(textEl, '');
+          if (nativeEl) nativeEl.value = '';
         }
       }
     });
@@ -1480,7 +1482,8 @@
       el.selectedMovieCard.classList.add('hidden');
       el.selectedMovieCard.classList.remove('flex');
     }
-    if (el.movieDateInput) el.movieDateInput.value = defaultDate || todayKey();
+    const initialDate = (typeof defaultDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(defaultDate)) ? defaultDate : todayKey();
+    if (el.movieDateInput) el.movieDateInput.value = initialDate;
     openModal(el.addMovieModal);
     setTimeout(() => {
       if (el.movieSearchInput) el.movieSearchInput.focus();
@@ -3257,7 +3260,7 @@
     }
 
     // Movie controls & modal listeners
-    if (el.openAddMovieBtn) el.openAddMovieBtn.addEventListener('click', openAddMovie);
+    if (el.openAddMovieBtn) el.openAddMovieBtn.addEventListener('click', () => openAddMovie());
     if (el.toggleMovieSelectBtn) el.toggleMovieSelectBtn.addEventListener('click', () => setMovieSelectMode(true));
     if (el.selectAllMoviesBtn) el.selectAllMoviesBtn.addEventListener('click', toggleSelectAllMovies);
     if (el.deleteSelectedMoviesBtn) el.deleteSelectedMoviesBtn.addEventListener('click', handleDeleteSelectedMovies);
