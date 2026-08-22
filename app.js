@@ -227,7 +227,7 @@
     // event modal
     eventModal: $('eventModal'), eventForm: $('eventForm'),
     eventModalTitle: $('eventModalTitle'), eventId: $('eventId'),
-    eventTitle: $('eventTitle'), eventDate: $('eventDate'), eventDesc: $('eventDesc'),
+    eventTitle: $('eventTitle'), eventDate: $('eventDate'), eventDateNative: $('eventDate_native'), eventDatePickerBtn: $('eventDate_pickerBtn'), eventDesc: $('eventDesc'),
     eventPhotoSection: $('eventPhotoSection'),
     photoUploadActions: $('photoUploadActions'),
     eventPhotoInput: $('eventPhotoInput'), uploadPhotoBtn: $('uploadPhotoBtn'),
@@ -246,6 +246,8 @@
     eventPhotoSyncOverlay1: $('eventPhotoSyncOverlay1'),
     eventPhotoSyncOverlay2: $('eventPhotoSyncOverlay2'),
     movieTicketSyncOverlay: $('movieTicketSyncOverlay'),
+    movieDateInputNative: $('movieDateInput_native'),
+    movieDateInputPickerBtn: $('movieDateInput_pickerBtn'),
     toastContainer: $('toastContainer'),
   };
 
@@ -258,6 +260,117 @@
   function parseKey(key) {
     const [y, m, d] = key.split('-').map(Number);
     return new Date(y, m - 1, d);
+  }
+
+  function isoToDmy(iso) {
+    if (!iso || typeof iso !== 'string') return '';
+    const parts = iso.split('-');
+    if (parts.length !== 3) return '';
+    const [yyyy, mm, dd] = parts;
+    const yy = yyyy.length === 4 ? yyyy.slice(2) : yyyy;
+    return `${dd}/${mm}/${yy}`;
+  }
+
+  function dmyToIso(dmy) {
+    if (!dmy || typeof dmy !== 'string') return '';
+    const parts = dmy.trim().split(/[\/\-\.]/);
+    if (parts.length !== 3) return '';
+    let [d, m, y] = parts;
+    if (!d || !m || !y) return '';
+    const dd = String(parseInt(d, 10) || '').padStart(2, '0');
+    const mm = String(parseInt(m, 10) || '').padStart(2, '0');
+    if (parseInt(dd, 10) < 1 || parseInt(dd, 10) > 31) return '';
+    if (parseInt(mm, 10) < 1 || parseInt(mm, 10) > 12) return '';
+    let yyyy = y.length === 2 ? `20${y}` : (y.length === 4 ? y : '');
+    if (!yyyy) return '';
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function formatDmyInputText(digits) {
+    const clean = digits.replace(/\D/g, '').slice(0, 6);
+    const d = clean.slice(0, 2);
+    const m = clean.slice(2, 4);
+    const y = clean.slice(4, 6);
+    if (y) return `${d}/${m}/${y}`;
+    if (m) return `${d}/${m}`;
+    return d;
+  }
+
+  function setupDmyDateInput(textEl, nativeEl, pickerBtn) {
+    if (!textEl) return;
+    const valueProp = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    let internalIso = '';
+
+    Object.defineProperty(textEl, 'value', {
+      get() {
+        const currentDisplayed = valueProp.get.call(textEl) || '';
+        const parsed = dmyToIso(currentDisplayed);
+        if (parsed) return parsed;
+        return internalIso || '';
+      },
+      set(val) {
+        if (!val) {
+          internalIso = '';
+          valueProp.set.call(textEl, '');
+          if (nativeEl) nativeEl.value = '';
+          return;
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+          internalIso = val;
+          const dmy = isoToDmy(val);
+          valueProp.set.call(textEl, dmy);
+          if (nativeEl) nativeEl.value = val;
+        } else if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(val)) {
+          const iso = dmyToIso(val);
+          internalIso = iso || '';
+          const dmy = iso ? isoToDmy(iso) : val;
+          valueProp.set.call(textEl, dmy);
+          if (nativeEl && iso) nativeEl.value = iso;
+        } else {
+          internalIso = val;
+          valueProp.set.call(textEl, val);
+        }
+      }
+    });
+
+    textEl.addEventListener('input', () => {
+      const raw = valueProp.get.call(textEl) || '';
+      const formatted = formatDmyInputText(raw);
+      valueProp.set.call(textEl, formatted);
+      if (formatted.length === 8) {
+        const iso = dmyToIso(formatted);
+        if (iso) {
+          internalIso = iso;
+          if (nativeEl) nativeEl.value = iso;
+        }
+      }
+    });
+
+    if (pickerBtn && nativeEl) {
+      pickerBtn.addEventListener('click', () => {
+        try {
+          if (typeof nativeEl.showPicker === 'function') {
+            nativeEl.showPicker();
+          } else {
+            nativeEl.focus();
+            nativeEl.click();
+          }
+        } catch {
+          nativeEl.focus();
+          nativeEl.click();
+        }
+      });
+    }
+
+    if (nativeEl) {
+      nativeEl.addEventListener('change', () => {
+        if (nativeEl.value) {
+          textEl.value = nativeEl.value;
+          textEl.dispatchEvent(new Event('input', { bubbles: true }));
+          textEl.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    }
   }
 
   /* ---------- Util umum ---------- */
@@ -3832,6 +3945,8 @@
 
   /* ---------- Init ---------- */
   function init() {
+    setupDmyDateInput(el.eventDate, el.eventDateNative, el.eventDatePickerBtn);
+    setupDmyDateInput(el.movieDateInput, el.movieDateInputNative, el.movieDateInputPickerBtn);
     initAuth();
     loadEvents();
     initTheme();
