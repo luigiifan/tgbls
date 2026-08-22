@@ -148,7 +148,6 @@
     saveUserBtn: $('saveUserBtn'),
     deleteUserFromFormBtn: $('deleteUserFromFormBtn'),
     // movie controls & modal
-    moviesHeaderTitleBlock: $('moviesHeaderTitleBlock'),
     moviesHeaderSearchBlock: $('moviesHeaderSearchBlock'),
     moviesSelectControls: $('moviesSelectControls'),
     toggleMovieSelectBtn: $('toggleMovieSelectBtn'),
@@ -173,7 +172,6 @@
     addMovieForm: $('addMovieForm'),
     movieSearchBlock: $('movieSearchBlock'),
     movieSearchInput: $('movieSearchInput'),
-    movieSearchBtn: $('movieSearchBtn'),
     movieSearchResults: $('movieSearchResults'),
     selectedMovieCard: $('selectedMovieCard'),
     selectedMoviePoster: $('selectedMoviePoster'),
@@ -226,6 +224,8 @@
     eventPhotoInput: $('eventPhotoInput'), uploadPhotoBtn: $('uploadPhotoBtn'),
     linkPhotoBtn: $('linkPhotoBtn'),
     photoPreviewContainer: $('photoPreviewContainer'), eventPhotoPreview: $('eventPhotoPreview'),
+    eventPhotoDisplayWrap: $('eventPhotoDisplayWrap'), eventPhotoDisplayImg: $('eventPhotoDisplayImg'),
+    photoCropEditWrap: $('photoCropEditWrap'),
     photoCropViewport: $('photoCropViewport'), photoZoomControls: $('photoZoomControls'),
     photoZoomSlider: $('photoZoomSlider'), photoResetBtn: $('photoResetBtn'),
     removePhotoBtn: $('removePhotoBtn'),
@@ -233,6 +233,10 @@
     linkedPhotoModal: $('linkedPhotoModal'),
     linkedPhotoTabs: $('linkedPhotoTabs'),
     linkedPhotoGrid: $('linkedPhotoGrid'),
+    // in-container photo sync overlays
+    eventPhotoSyncOverlay1: $('eventPhotoSyncOverlay1'),
+    eventPhotoSyncOverlay2: $('eventPhotoSyncOverlay2'),
+    movieTicketSyncOverlay: $('movieTicketSyncOverlay'),
     toastContainer: $('toastContainer'),
   };
 
@@ -293,9 +297,6 @@
   function sortEvents(a, b) {
     return (a.title || '').localeCompare(b.title || '');
   }
-  function eventsForDate(key) {
-    return events.filter((e) => e.date === key).sort(sortEvents);
-  }
 
 
   /* ---------- Storage (localStorage cache + remote sync) ---------- */
@@ -318,28 +319,14 @@
     return result;
   }
 
-  const DEFAULT_MOVIES_LIST = [
-    { id: 'mov_1_spider_verse_2', title: 'Spider-Man: Across the Spider-Verse', year: '2023', poster: 'https://images.metahub.space/poster/small/tt9362722/img', ticket: '', rating: '9.5', date: '2026-08-20' },
-    { id: 'mov_2_oppenheimer', title: 'Oppenheimer', year: '2023', poster: 'https://images.metahub.space/poster/small/tt15398776/img', ticket: '', rating: '9.0', date: '2026-08-18' },
-    { id: 'mov_3_interstellar', title: 'Interstellar', year: '2014', poster: 'https://images.metahub.space/poster/small/tt0816692/img', ticket: '', rating: '9.5', date: '2026-08-16' },
-    { id: 'mov_4_dune_2', title: 'Dune: Part Two', year: '2024', poster: 'https://images.metahub.space/poster/small/tt15239678/img', ticket: '', rating: '9.0', date: '2026-08-14' },
-    { id: 'mov_5_dark_knight', title: 'The Dark Knight', year: '2008', poster: 'https://images.metahub.space/poster/small/tt0468569/img', ticket: '', rating: '10.0', date: '2026-08-12' },
-    { id: 'mov_6_inception', title: 'Inception', year: '2010', poster: 'https://images.metahub.space/poster/small/tt1375666/img', ticket: '', rating: '9.0', date: '2026-08-10' },
-    { id: 'mov_7_eeao', title: 'Everything Everywhere All at Once', year: '2022', poster: 'https://images.metahub.space/poster/small/tt6710474/img', ticket: '', rating: '8.5', date: '2026-08-08' },
-    { id: 'mov_8_spirited_away', title: 'Spirited Away', year: '2001', poster: 'https://images.metahub.space/poster/small/tt0245429/img', ticket: '', rating: '9.5', date: '2026-08-06' },
-    { id: 'mov_9_la_la_land', title: 'La La Land', year: '2016', poster: 'https://images.metahub.space/poster/small/tt3783958/img', ticket: '', rating: '8.5', date: '2026-08-04' },
-    { id: 'mov_10_parasite', title: 'Parasite', year: '2019', poster: 'https://images.metahub.space/poster/small/tt6751668/img', ticket: '', rating: '9.0', date: '2026-08-02' },
-    { id: 'mov_11_gotg_3', title: 'Guardians of the Galaxy Vol. 3', year: '2023', poster: 'https://images.metahub.space/poster/small/tt6791350/img', ticket: '', rating: '8.5', date: '2026-07-30' },
-    { id: 'mov_12_whiplash', title: 'Whiplash', year: '2014', poster: 'https://images.metahub.space/poster/small/tt2582802/img', ticket: '', rating: '9.0', date: '2026-07-28' },
-    { id: 'mov_13_coco', title: 'Coco', year: '2017', poster: 'https://images.metahub.space/poster/small/tt2380307/img', ticket: '', rating: '8.5', date: '2026-07-25' },
-    { id: 'mov_14_your_name', title: 'Your Name.', year: '2016', poster: 'https://images.metahub.space/poster/small/tt5311514/img', ticket: '', rating: '9.0', date: '2026-07-22' },
-    { id: 'mov_15_avatar_2', title: 'Avatar: The Way of Water', year: '2022', poster: 'https://images.metahub.space/poster/small/tt1630029/img', ticket: '', rating: '7.5', date: '2026-07-20' },
-    { id: 'mov_16_the_batman', title: 'The Batman', year: '2022', poster: 'https://images.metahub.space/poster/small/tt1877830/img', ticket: '', rating: '8.0', date: '2026-07-18' },
-    { id: 'mov_17_inside_out_2', title: 'Inside Out 2', year: '2024', poster: 'https://images.metahub.space/poster/small/tt22022452/img', ticket: '', rating: '8.5', date: '2026-07-15' },
-    { id: 'mov_18_top_gun_2', title: 'Top Gun: Maverick', year: '2022', poster: 'https://images.metahub.space/poster/small/tt1745960/img', ticket: '', rating: '8.5', date: '2026-07-12' },
-    { id: 'mov_19_suzume', title: 'Suzume', year: '2022', poster: 'https://images.metahub.space/poster/small/tt16428256/img', ticket: '', rating: '8.0', date: '2026-07-10' },
-    { id: 'mov_20_spider_verse_1', title: 'Spider-Man: Into the Spider-Verse', year: '2018', poster: 'https://images.metahub.space/poster/small/tt4633694/img', ticket: '', rating: '9.5', date: '2026-07-08' },
-  ];
+  const DEFAULT_MOVIES_LIST = [];
+  const DEFAULT_DUMMY_MOVIE_IDS = new Set([
+    'mov_1_spider_verse_2', 'mov_2_oppenheimer', 'mov_3_interstellar', 'mov_4_dune_2',
+    'mov_5_dark_knight', 'mov_6_inception', 'mov_7_eeao', 'mov_8_spirited_away',
+    'mov_9_la_la_land', 'mov_10_parasite', 'mov_11_gotg_3', 'mov_12_whiplash',
+    'mov_13_coco', 'mov_14_your_name', 'mov_15_avatar_2', 'mov_16_the_batman',
+    'mov_17_inside_out_2', 'mov_18_top_gun_2', 'mov_19_suzume', 'mov_20_spider_verse_1'
+  ]);
 
   function loadEvents() {
     try { events = JSON.parse(localStorage.getItem(KEY_EVENTS)) || []; }
@@ -347,31 +334,93 @@
     try {
       const cached = JSON.parse(localStorage.getItem(KEY_MOVIES));
       if (Array.isArray(cached) && cached.length > 0) {
-        movies = deduplicateMovies(cached.filter((m) => m && m.id));
+        movies = deduplicateMovies(cached.filter((m) => m && m.id && !DEFAULT_DUMMY_MOVIE_IDS.has(m.id)));
       } else {
-        movies = [...DEFAULT_MOVIES_LIST];
-        saveMovies();
+        movies = [];
       }
+      saveMoviesLocally();
     } catch {
-      movies = [...DEFAULT_MOVIES_LIST];
-      saveMovies();
+      movies = [];
+      saveMoviesLocally();
     }
   }
-  function saveEvents() {
+  function saveEventsLocally() {
     try {
       localStorage.setItem(KEY_EVENTS, JSON.stringify(events));
     } catch (err) {
       console.warn('LocalStorage write warning:', err);
     }
-    schedulePush();
   }
-  function saveMovies() {
+  function saveMoviesLocally() {
     try {
       localStorage.setItem(KEY_MOVIES, JSON.stringify(movies));
     } catch (err) {
       console.warn('LocalStorage movies write warning:', err);
     }
+  }
+
+  function saveEvents() {
+    saveEventsLocally();
     schedulePush();
+  }
+  function saveMovies() {
+    saveMoviesLocally();
+    schedulePush();
+  }
+
+  // In-Photo Sync Loading Indicators & State
+  let isSyncingActive = false;
+
+  function setEventPhotoSyncLoading(loading) {
+    isSyncingActive = Boolean(loading);
+    if (el.eventPhotoSyncOverlay1) {
+      el.eventPhotoSyncOverlay1.classList.toggle('hidden', !loading);
+      el.eventPhotoSyncOverlay1.classList.toggle('flex', Boolean(loading));
+    }
+    if (el.eventPhotoSyncOverlay2) {
+      el.eventPhotoSyncOverlay2.classList.toggle('hidden', !loading);
+      el.eventPhotoSyncOverlay2.classList.toggle('flex', Boolean(loading));
+    }
+    const saveBtn = el.eventModal ? el.eventModal.querySelector('button[type="submit"]') : null;
+    if (saveBtn) {
+      saveBtn.disabled = Boolean(loading);
+      saveBtn.classList.toggle('opacity-50', Boolean(loading));
+    }
+  }
+
+  function setMovieTicketSyncLoading(loading) {
+    isSyncingActive = Boolean(loading);
+    if (el.movieTicketSyncOverlay) {
+      el.movieTicketSyncOverlay.classList.toggle('hidden', !loading);
+      el.movieTicketSyncOverlay.classList.toggle('flex', Boolean(loading));
+    }
+    if (el.saveMovieRatingBtn) {
+      el.saveMovieRatingBtn.disabled = Boolean(loading);
+      el.saveMovieRatingBtn.classList.toggle('opacity-50', Boolean(loading));
+      el.saveMovieRatingBtn.textContent = loading ? 'Saving...' : 'Save';
+    }
+    if (el.movieShowTicketMobileBtn) {
+      el.movieShowTicketMobileBtn.disabled = Boolean(loading);
+    }
+  }
+
+  function setDetailCropSyncLoading(loading) {
+    isSyncingActive = Boolean(loading);
+    const overlay = $('detailCropSyncOverlay');
+    if (overlay) {
+      overlay.classList.toggle('hidden', !loading);
+      overlay.classList.toggle('flex', Boolean(loading));
+    }
+    const saveBtn = $('detailSaveCropBtn');
+    if (saveBtn) {
+      saveBtn.disabled = Boolean(loading);
+      saveBtn.classList.toggle('opacity-50', Boolean(loading));
+      saveBtn.textContent = loading ? 'Saving...' : 'Save Photo';
+    }
+    const cancelBtn = $('detailCancelCropBtn');
+    if (cancelBtn) {
+      cancelBtn.disabled = Boolean(loading);
+    }
   }
 
   function schedulePush() {
@@ -387,8 +436,17 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ events, tags: [], movies }),
       });
-      if (r.ok) { remoteOn = true; dirty = false; }
-    } catch { remoteOn = false; }
+      if (r.ok) {
+        remoteOn = true;
+        dirty = false;
+        return true;
+      }
+      remoteOn = false;
+      return false;
+    } catch (err) {
+      remoteOn = false;
+      return false;
+    }
   }
   // Pull the shared state from the DB and adopt it (falls back to cache offline).
   async function pullRemote() {
@@ -406,14 +464,17 @@
         try { localStorage.setItem(KEY_EVENTS, JSON.stringify(events)); } catch {}
       }
 
-      if (Array.isArray(data.movies) && data.movies.length > 0) {
-        const cleanRemote = data.movies.filter((m) => m && m.id);
+      if (Array.isArray(data.movies)) {
+        const cleanRemote = data.movies.filter((m) => m && m.id && !DEFAULT_DUMMY_MOVIE_IDS.has(m.id));
+        const hadDummies = cleanRemote.length !== data.movies.length;
         movies = deduplicateMovies(cleanRemote);
         try { localStorage.setItem(KEY_MOVIES, JSON.stringify(movies)); } catch {}
-      } else if (movies.length === 0) {
-        movies = [...DEFAULT_MOVIES_LIST];
+        if (hadDummies) {
+          pushRemote();
+        }
+      } else {
+        movies = [];
         try { localStorage.setItem(KEY_MOVIES, JSON.stringify(movies)); } catch {}
-        pushRemote();
       }
 
       renderAll();
@@ -630,7 +691,6 @@
         if (el.loginForm) el.loginForm.reset();
         closeModal(el.loginModal);
         if (el.profileDropdown) el.profileDropdown.classList.add('hidden');
-        toast(`Welcome back, ${currentUser.name}!`);
       } else {
         if (el.loginErrorMsg) {
           el.loginErrorMsg.textContent = 'Invalid username or password.';
@@ -652,7 +712,6 @@
     if (el.profileDropdown) el.profileDropdown.classList.add('hidden');
     if (el.profileBackdrop) el.profileBackdrop.classList.add('hidden');
     document.documentElement.classList.remove('is-profile-open');
-    toast('Logged out');
   }
 
   /* ---------- Render kalender ---------- */
@@ -1137,6 +1196,8 @@
         el.moviesProgressSubtitle.textContent = `${selectedMovieIds.size} selected`;
       } else if (watchedMovieQuery) {
         el.moviesProgressSubtitle.textContent = `${filtered.length} found`;
+      } else if (filtered.length === 0) {
+        el.moviesProgressSubtitle.textContent = '0 movies';
       } else {
         el.moviesProgressSubtitle.textContent = `${moviesPage + 1} of ${totalPages}`;
       }
@@ -1580,28 +1641,39 @@
     openModal(el.movieDetailModal);
   }
 
-  function handleSaveMovieRating() {
-    if (!activeDetailMovieId) return;
+  async function handleSaveMovieRating() {
+    if (!activeDetailMovieId || isSyncingActive) return;
     const movie = movies.find((m) => m.id === activeDetailMovieId);
     if (!movie) return;
 
-    const num = el.movieRatingSlider ? parseFloat(el.movieRatingSlider.value) : (parseFloat(el.detailRatingInput?.value) || 0);
-    if (num > 0) {
-      const clamped = Math.min(10, Math.max(0, num));
-      movie.rating = formatRatingDisplay(clamped);
-    } else {
-      movie.rating = '';
+    try {
+      const num = el.movieRatingSlider ? parseFloat(el.movieRatingSlider.value) : (parseFloat(el.detailRatingInput?.value) || 0);
+      if (num > 0) {
+        const clamped = Math.min(10, Math.max(0, num));
+        movie.rating = formatRatingDisplay(clamped);
+      } else {
+        movie.rating = '';
+      }
+
+      movie.ticket = activeTicketPhoto || '';
+
+      setMovieTicketSyncLoading(true);
+      saveMoviesLocally();
+
+      const ok = await pushRemote();
+      setMovieTicketSyncLoading(false);
+
+      renderMoviesGrid();
+      renderStats();
+
+      // Return to preview/view mode instead of closing the modal
+      setDetailRatingDisplay(movie.rating);
+      setRatingEditMode(false);
+    } catch (err) {
+      console.error('Error saving movie rating:', err);
+      setMovieTicketSyncLoading(false);
+      toast('Failed to save movie rating');
     }
-
-    movie.ticket = activeTicketPhoto || '';
-
-    saveMovies();
-    renderMoviesGrid();
-    renderStats();
-
-    // Return to preview/view mode instead of closing the modal
-    setDetailRatingDisplay(movie.rating);
-    setRatingEditMode(false);
   }
 
   function handleDeleteMovie() {
@@ -1813,7 +1885,7 @@
     document.body.style.overflow = 'hidden';
   }
   function closeModal(m) {
-    if (!m) return;
+    if (!m || isSyncingActive) return;
     m.classList.add('hidden'); m.classList.remove('flex');
     if (!anyModalOpen()) document.body.style.overflow = '';
   }
@@ -1821,6 +1893,7 @@
     closeModal(m);
   }
   function closeTopModal() {
+    if (isSyncingActive) return;
     for (const m of MODALS()) {
       if (m && !m.classList.contains('hidden')) { closeModalSmart(m); break; }
     }
@@ -2113,7 +2186,6 @@
 
       closeModal(el.userFormModal);
       renderUsersList();
-      toast(id ? 'User updated successfully' : 'User created successfully');
     } catch (err) {
       if (el.userFormErrorMsg) {
         el.userFormErrorMsg.textContent = String(err.message || err);
@@ -2170,7 +2242,6 @@
       }
 
       renderUsersList();
-      toast('User deleted');
       return true;
     } catch (err) {
       toast('Error deleting user: ' + err.message);
@@ -2246,8 +2317,12 @@
             <img id="detailCropPreview" src="${detailCropImageObj.src}" alt="Photo preview"
               class="pointer-events-none absolute left-1/2 top-1/2 max-h-none max-w-none select-none" />
             <div class="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-black/10 dark:ring-white/10"></div>
-            <div class="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-neutral-900/60 px-2 py-0.5 text-[10px] font-medium text-white/80 backdrop-blur-sm">
-              Drag to reposition
+            <!-- In-Photo Sync Loading Overlay -->
+            <div id="detailCropSyncOverlay" class="hidden absolute inset-0 z-20 items-center justify-center rounded-2xl bg-neutral-950/60 backdrop-blur-xs animate-fade-in pointer-events-auto">
+              <svg class="h-8 w-8 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
             </div>
           </div>
 
@@ -2526,13 +2601,17 @@
     return canvas.toDataURL('image/jpeg', quality);
   }
 
-  function loadPhotoForCropping(src) {
+  let isFormPhotoEditing = false;
+
+  function loadPhotoForCropping(src, startInEditMode = true) {
     if (!src) {
       cropImageObj = null;
       formPhoto = null;
+      isFormPhotoEditing = false;
       renderPhotoForm();
       return;
     }
+    isFormPhotoEditing = startInEditMode;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -2545,12 +2624,18 @@
       if (el.eventPhotoPreview) {
         el.eventPhotoPreview.src = src;
       }
+      if (el.eventPhotoDisplayImg) {
+        el.eventPhotoDisplayImg.src = src;
+      }
       renderPhotoForm();
-      setTimeout(updateCropperTransform, 30);
+      if (isFormPhotoEditing) {
+        setTimeout(updateCropperTransform, 30);
+      }
     };
     img.onerror = () => {
       cropImageObj = null;
       formPhoto = null;
+      isFormPhotoEditing = false;
       renderPhotoForm();
     };
     img.src = src;
@@ -2592,12 +2677,12 @@
 
     if (el.photoResetBtn) {
       const isModified = cropZoom > 1 || Math.abs(cropX) > 1 || Math.abs(cropY) > 1;
-      el.photoResetBtn.classList.toggle('hidden', !isModified);
+      el.photoResetBtn.classList.toggle('hidden', !isModified || !isFormPhotoEditing);
     }
   }
 
   function exportCroppedSquarePhoto(targetSize = 800, quality = 0.6) {
-    if (!cropImageObj) return formPhoto;
+    if (!isFormPhotoEditing || !cropImageObj) return formPhoto;
     const m = getCropperMetrics();
     if (!m) return formPhoto;
 
@@ -2640,9 +2725,28 @@
         el.photoPreviewContainer.classList.add('flex');
       }
       if (el.photoUploadActions) el.photoUploadActions.classList.add('hidden');
+
+      if (isFormPhotoEditing) {
+        if (el.eventPhotoDisplayWrap) el.eventPhotoDisplayWrap.classList.add('hidden');
+        if (el.photoCropEditWrap) {
+          el.photoCropEditWrap.classList.remove('hidden');
+          el.photoCropEditWrap.classList.add('flex');
+        }
+        updateCropperTransform();
+      } else {
+        if (el.eventPhotoDisplayWrap) el.eventPhotoDisplayWrap.classList.remove('hidden');
+        if (el.eventPhotoDisplayImg) el.eventPhotoDisplayImg.src = formPhoto;
+        if (el.photoCropEditWrap) {
+          el.photoCropEditWrap.classList.add('hidden');
+          el.photoCropEditWrap.classList.remove('flex');
+        }
+        if (el.photoResetBtn) el.photoResetBtn.classList.add('hidden');
+      }
     } else {
       cropImageObj = null;
+      isFormPhotoEditing = false;
       if (el.eventPhotoPreview) el.eventPhotoPreview.src = '';
+      if (el.eventPhotoDisplayImg) el.eventPhotoDisplayImg.src = '';
       if (el.photoPreviewContainer) {
         el.photoPreviewContainer.classList.add('hidden');
         el.photoPreviewContainer.classList.remove('flex');
@@ -2745,10 +2849,11 @@
       el.eventDate.value = ev.date;
       el.eventDesc.value = ev.desc || '';
       if (ev.photo) {
-        loadPhotoForCropping(ev.photo);
+        loadPhotoForCropping(ev.photo, false);
       } else {
         formPhoto = null;
         cropImageObj = null;
+        isFormPhotoEditing = false;
         renderPhotoForm();
       }
     } else {
@@ -2757,6 +2862,7 @@
       el.eventDate.value = selectedDate || todayKey();
       formPhoto = null;
       cropImageObj = null;
+      isFormPhotoEditing = false;
       renderPhotoForm();
     }
 
@@ -2777,8 +2883,9 @@
     }, 50);
   }
 
-  function handleEventSubmit(e) {
+  async function handleEventSubmit(e) {
     e.preventDefault();
+    if (isSyncingActive) return;
 
     try {
       const title = el.eventTitle.value.trim().slice(0, 50);
@@ -2794,6 +2901,8 @@
 
       const desc = el.eventDesc.value.trim().slice(0, 50);
       const finalPhoto = cropImageObj ? exportCroppedSquarePhoto() : formPhoto;
+      const hasPhoto = Boolean(finalPhoto);
+
       const payload = {
         title, date, desc,
         photo: finalPhoto || null,
@@ -2806,7 +2915,21 @@
         events.push({ id: uid(), ...payload });
       }
 
-      saveEvents();
+      if (hasPhoto) {
+        setEventPhotoSyncLoading(true);
+      } else {
+        isSyncingActive = true;
+      }
+
+      saveEventsLocally();
+      const ok = await pushRemote();
+
+      if (hasPhoto) {
+        setEventPhotoSyncLoading(false);
+      } else {
+        isSyncingActive = false;
+      }
+
       closeModal(el.eventModal);
 
       selectedDate = date;
@@ -2818,6 +2941,8 @@
       openDay(date);
     } catch (err) {
       console.error('Error saving event:', err);
+      setEventPhotoSyncLoading(false);
+      isSyncingActive = false;
       toast('Failed to save event');
     }
   }
@@ -3155,7 +3280,6 @@
     }
     if (el.saveMovieRatingBtn) el.saveMovieRatingBtn.addEventListener('click', handleSaveMovieRating);
     if (el.deleteMovieBtn) el.deleteMovieBtn.addEventListener('click', handleDeleteMovie);
-    if (el.movieSearchBtn) el.movieSearchBtn.addEventListener('click', () => searchMovies(el.movieSearchInput ? el.movieSearchInput.value : ''));
     if (el.movieSearchInput) {
       el.movieSearchInput.addEventListener('input', (e) => {
         clearTimeout(searchDebounceTimer);
@@ -3223,7 +3347,6 @@
         saveEvents();
         updateDayBookmarkBtn(ev);
         renderBookmarksList();
-        toast(ev.bookmarked ? 'Added to bookmarks' : 'Removed from bookmarks');
       });
     }
 
@@ -3262,11 +3385,24 @@
         toast('Failed to process image');
       }
     });
-    if (el.removePhotoBtn) el.removePhotoBtn.addEventListener('click', () => {
-      formPhoto = null;
-      cropImageObj = null;
-      renderPhotoForm();
-    });
+    if (el.eventPhotoDisplayWrap) {
+      el.eventPhotoDisplayWrap.addEventListener('click', (e) => {
+        if (e.target.closest('#removePhotoBtn')) return;
+        isFormPhotoEditing = true;
+        renderPhotoForm();
+        setTimeout(updateCropperTransform, 30);
+      });
+    }
+
+    if (el.removePhotoBtn) {
+      el.removePhotoBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        formPhoto = null;
+        cropImageObj = null;
+        isFormPhotoEditing = false;
+        renderPhotoForm();
+      });
+    }
 
     // Photo Cropper drag & zoom listeners
     if (el.photoCropViewport) {
@@ -3410,7 +3546,7 @@
     });
 
     // klik global (delegation)
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', async (e) => {
       // close day add dropdown when clicking outside
       if (!e.target.closest('#dayAddMenuWrap')) {
         if (el.dayAddDropdownMenu) el.dayAddDropdownMenu.classList.add('hidden');
@@ -3484,13 +3620,17 @@
       }
 
       const detailSaveBtn = e.target.closest('#detailSaveCropBtn');
-      if (detailSaveBtn) {
+      if (detailSaveBtn && !isSyncingActive) {
         const ev = eventForDate(selectedDate);
         if (ev && detailCropImageObj) {
           const cropped = exportDetailCroppedSquarePhoto();
           if (cropped) {
             ev.photo = cropped;
-            saveEvents();
+            setDetailCropSyncLoading(true);
+            saveEventsLocally();
+            const ok = await pushRemote();
+            setDetailCropSyncLoading(false);
+
             detailCroppingEvId = null;
             detailCropImageObj = null;
             renderDay();
@@ -3534,7 +3674,6 @@
           if (selectedDate === date && el.dayModal && !el.dayModal.classList.contains('hidden')) {
             updateDayBookmarkBtn(ev);
           }
-          toast('Removed from bookmarks');
         }
         return;
       }
