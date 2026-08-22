@@ -168,6 +168,14 @@
     mobileAddMovieBtn: $('mobileAddMovieBtn'),
     mobileSearchMovieBtn: $('mobileSearchMovieBtn'),
     mobileSelectMovieBtn: $('mobileSelectMovieBtn'),
+    movieMobileSelectActionsWrap: $('movieMobileSelectActionsWrap'),
+    movieMobileSelectActionsBtn: $('movieMobileSelectActionsBtn'),
+    movieMobileSelectActionsMenu: $('movieMobileSelectActionsMenu'),
+    mobileSelectAllBtn: $('mobileSelectAllBtn'),
+    mobileSelectAllText: $('mobileSelectAllText'),
+    mobileDeleteSelectedBtn: $('mobileDeleteSelectedBtn'),
+    mobileDeleteSelectedText: $('mobileDeleteSelectedText'),
+    mobileCancelSelectBtn: $('mobileCancelSelectBtn'),
     addMovieModal: $('addMovieModal'),
     addMovieForm: $('addMovieForm'),
     movieSearchBlock: $('movieSearchBlock'),
@@ -997,9 +1005,9 @@
       el.toggleMovieSelectBtn.classList.toggle('hidden', isWatchedSearchActive || movies.length === 0);
     }
     if (el.moviesDesktopControls) {
-      // Desktop controls wrapper stays visible so openMovieSearchBtn (acting as back button) remains accessible
-      el.moviesDesktopControls.classList.remove('hidden');
-      el.moviesDesktopControls.classList.add('sm:flex');
+      // Keep 'hidden' so desktop controls are NEVER displayed on mobile (< sm)
+      el.moviesDesktopControls.classList.add('hidden');
+      el.moviesDesktopControls.classList.toggle('sm:flex', !isMovieSelectMode);
     }
     if (el.openMovieSearchBtn) {
       el.openMovieSearchBtn.classList.remove('hidden');
@@ -1044,17 +1052,18 @@
 
   function updateMovieSelectControls() {
     if (el.moviesDesktopControls) {
-      el.moviesDesktopControls.classList.toggle('hidden', isMovieSelectMode);
+      // Keep 'hidden' so desktop controls are NEVER displayed on mobile (< sm)
+      el.moviesDesktopControls.classList.add('hidden');
       el.moviesDesktopControls.classList.toggle('sm:flex', !isMovieSelectMode);
     }
     if (el.openAddMovieBtn) {
-      el.openAddMovieBtn.classList.toggle('hidden', isMovieSelectMode || isWatchedSearchActive);
+      el.openAddMovieBtn.classList.toggle('hidden', isWatchedSearchActive);
     }
     if (el.toggleMovieSelectBtn) {
-      el.toggleMovieSelectBtn.classList.toggle('hidden', isMovieSelectMode || isWatchedSearchActive || movies.length === 0);
+      el.toggleMovieSelectBtn.classList.toggle('hidden', isWatchedSearchActive || movies.length === 0);
     }
     if (el.openMovieSearchBtn) {
-      el.openMovieSearchBtn.classList.toggle('hidden', isMovieSelectMode);
+      el.openMovieSearchBtn.classList.remove('hidden');
     }
     if (el.movieMobileActionsWrap) {
       el.movieMobileActionsWrap.classList.toggle('hidden', isMovieSelectMode);
@@ -1063,11 +1072,36 @@
       el.moviesPager.classList.toggle('hidden', isWatchedSearchActive);
     }
     if (el.moviesSelectControls) {
-      el.moviesSelectControls.classList.toggle('hidden', !isMovieSelectMode);
-      el.moviesSelectControls.classList.toggle('flex', isMovieSelectMode);
+      el.moviesSelectControls.classList.add('hidden');
+      el.moviesSelectControls.classList.toggle('sm:flex', isMovieSelectMode);
     }
+    if (el.movieMobileSelectActionsWrap) {
+      el.movieMobileSelectActionsWrap.classList.toggle('hidden', !isMovieSelectMode);
+      el.movieMobileSelectActionsWrap.classList.toggle('inline-flex', isMovieSelectMode);
+    }
+
+    const hasSelection = selectedMovieIds.size > 0;
     if (el.deleteSelectedMoviesBtn) {
-      el.deleteSelectedMoviesBtn.disabled = selectedMovieIds.size === 0;
+      el.deleteSelectedMoviesBtn.disabled = !hasSelection;
+    }
+    if (el.mobileDeleteSelectedBtn) {
+      el.mobileDeleteSelectedBtn.disabled = !hasSelection;
+    }
+    if (el.mobileDeleteSelectedText) {
+      el.mobileDeleteSelectedText.textContent = hasSelection ? `Delete (${selectedMovieIds.size})` : 'Delete';
+    }
+
+    const filtered = watchedMovieQuery
+      ? movies.filter((m) => {
+          const q = watchedMovieQuery.toLowerCase();
+          const title = (m.title || '').toLowerCase();
+          const year = String(m.year || '');
+          return title.includes(q) || year.includes(q);
+        })
+      : movies;
+    const allSelected = filtered.length > 0 && filtered.every((m) => selectedMovieIds.has(m.id));
+    if (el.mobileSelectAllText) {
+      el.mobileSelectAllText.textContent = allSelected ? 'Deselect All' : 'Select All';
     }
   }
 
@@ -1077,9 +1111,7 @@
     } else {
       selectedMovieIds.add(id);
     }
-    if (el.deleteSelectedMoviesBtn) {
-      el.deleteSelectedMoviesBtn.disabled = selectedMovieIds.size === 0;
-    }
+    updateMovieSelectControls();
     if (el.moviesProgressSubtitle && isMovieSelectMode) {
       el.moviesProgressSubtitle.textContent = `${selectedMovieIds.size} selected`;
     }
@@ -1103,9 +1135,7 @@
       filtered.forEach((m) => selectedMovieIds.add(m.id));
     }
 
-    if (el.deleteSelectedMoviesBtn) {
-      el.deleteSelectedMoviesBtn.disabled = selectedMovieIds.size === 0;
-    }
+    updateMovieSelectControls();
     if (el.moviesProgressSubtitle && isMovieSelectMode) {
       el.moviesProgressSubtitle.textContent = `${selectedMovieIds.size} selected`;
     }
@@ -3134,6 +3164,32 @@
         setMovieSelectMode(true);
       });
     }
+    if (el.movieMobileSelectActionsBtn) {
+      el.movieMobileSelectActionsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (el.movieMobileSelectActionsMenu) {
+          el.movieMobileSelectActionsMenu.classList.toggle('hidden');
+        }
+      });
+    }
+    if (el.mobileSelectAllBtn) {
+      el.mobileSelectAllBtn.addEventListener('click', () => {
+        if (el.movieMobileSelectActionsMenu) el.movieMobileSelectActionsMenu.classList.add('hidden');
+        toggleSelectAllMovies();
+      });
+    }
+    if (el.mobileDeleteSelectedBtn) {
+      el.mobileDeleteSelectedBtn.addEventListener('click', () => {
+        if (el.movieMobileSelectActionsMenu) el.movieMobileSelectActionsMenu.classList.add('hidden');
+        handleDeleteSelectedMovies();
+      });
+    }
+    if (el.mobileCancelSelectBtn) {
+      el.mobileCancelSelectBtn.addEventListener('click', () => {
+        if (el.movieMobileSelectActionsMenu) el.movieMobileSelectActionsMenu.classList.add('hidden');
+        setMovieSelectMode(false);
+      });
+    }
     if (el.watchedMovieSearchInput) {
       el.watchedMovieSearchInput.addEventListener('input', (e) => {
         watchedMovieQuery = (e.target.value || '').trim().toLowerCase();
@@ -3555,6 +3611,11 @@
       // close movie mobile actions dropdown when clicking outside
       if (!e.target.closest('#movieMobileActionsWrap')) {
         if (el.movieMobileActionsMenu) el.movieMobileActionsMenu.classList.add('hidden');
+      }
+
+      // close movie mobile select actions dropdown when clicking outside
+      if (!e.target.closest('#movieMobileSelectActionsWrap')) {
+        if (el.movieMobileSelectActionsMenu) el.movieMobileSelectActionsMenu.classList.add('hidden');
       }
 
       const moviePrev = e.target.closest('[data-movie-prev]');
