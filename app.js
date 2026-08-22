@@ -328,6 +328,15 @@
     return result;
   }
 
+  function sortMoviesDesc(a, b) {
+    const dateA = (a && a.date) ? String(a.date) : '';
+    const dateB = (b && b.date) ? String(b.date) : '';
+    if (dateA !== dateB) {
+      return dateB.localeCompare(dateA); // Tanggal terbaru di paling atas (descending)
+    }
+    return (a.title || '').localeCompare(b.title || '');
+  }
+
   const DEFAULT_MOVIES_LIST = [];
   const DEFAULT_DUMMY_MOVIE_IDS = new Set([
     'mov_1_spider_verse_2', 'mov_2_oppenheimer', 'mov_3_interstellar', 'mov_4_dune_2',
@@ -343,7 +352,7 @@
     try {
       const cached = JSON.parse(localStorage.getItem(KEY_MOVIES));
       if (Array.isArray(cached) && cached.length > 0) {
-        movies = deduplicateMovies(cached.filter((m) => m && m.id && !DEFAULT_DUMMY_MOVIE_IDS.has(m.id)));
+        movies = deduplicateMovies(cached.filter((m) => m && m.id && !DEFAULT_DUMMY_MOVIE_IDS.has(m.id))).sort(sortMoviesDesc);
       } else {
         movies = [];
       }
@@ -476,7 +485,7 @@
       if (Array.isArray(data.movies)) {
         const cleanRemote = data.movies.filter((m) => m && m.id && !DEFAULT_DUMMY_MOVIE_IDS.has(m.id));
         const hadDummies = cleanRemote.length !== data.movies.length;
-        movies = deduplicateMovies(cleanRemote);
+        movies = deduplicateMovies(cleanRemote).sort(sortMoviesDesc);
         try { localStorage.setItem(KEY_MOVIES, JSON.stringify(movies)); } catch {}
         if (hadDummies) {
           pushRemote();
@@ -1213,6 +1222,8 @@
 
     updateMovieSelectControls();
 
+    movies.sort(sortMoviesDesc);
+
     const filtered = watchedMovieQuery
       ? movies.filter((m) => {
           const q = watchedMovieQuery.toLowerCase();
@@ -1499,7 +1510,8 @@
       rating: ''
     };
 
-    movies.unshift(newMovie);
+    movies.push(newMovie);
+    movies.sort(sortMoviesDesc);
     moviesPage = 0;
     saveMovies();
     renderMoviesGrid();
