@@ -65,12 +65,40 @@ async function sbUpsert(data) {
 function readBody(req) {
   return new Promise((resolve) => {
     if (req.body && typeof req.body === 'object') return resolve(req.body);
+    if (typeof req.body === 'string') {
+      try { return resolve(JSON.parse(req.body)); } catch { return resolve({}); }
+    }
     let raw = '';
     req.on('data', (c) => { raw += c; });
     req.on('end', () => { try { resolve(JSON.parse(raw || '{}')); } catch { resolve({}); } });
     req.on('error', () => resolve({}));
   });
 }
+
+const DEFAULT_USERS = [
+  {
+    id: 'usr_lgiifn',
+    username: 'lgiifn',
+    pass: '13052004',
+    name: 'Luigi Ifan',
+    sex: 'Him',
+    theme: 'dark',
+    role: 'admin',
+    permissions: { canManageEvents: true, canManageMovies: true, canManageUsers: true },
+    createdAt: 1700000000000,
+  },
+  {
+    id: 'usr_ysfany',
+    username: 'ysfany',
+    pass: '13042003',
+    name: 'Yousyta Fany',
+    sex: 'Her',
+    theme: 'pink',
+    role: 'admin',
+    permissions: { canManageEvents: true, canManageMovies: true, canManageUsers: true },
+    createdAt: 1700000000000,
+  },
+];
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -87,11 +115,20 @@ module.exports = async (req, res) => {
     if (req.method === 'POST') {
       const body = await readBody(req);
       const existingState = (await sbGet()) || {};
+      let users = Array.isArray(existingState.users) && existingState.users.length > 0 ? [...existingState.users] : [...DEFAULT_USERS];
+
+      // Ensure default users exist
+      for (const def of DEFAULT_USERS) {
+        if (!users.some((u) => u.username && u.username.toLowerCase() === def.username.toLowerCase())) {
+          users.push({ ...def });
+        }
+      }
+
       const data = {
         events: Array.isArray(body.events) ? body.events : (existingState.events || []),
         tags: Array.isArray(body.tags) ? body.tags : (existingState.tags || []),
         movies: Array.isArray(body.movies) ? body.movies : (existingState.movies || []),
-        users: Array.isArray(existingState.users) ? existingState.users : [],
+        users,
         updatedAt: Date.now(),
       };
       await sbUpsert(data);

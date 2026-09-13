@@ -98,6 +98,9 @@ function sanitizeUser(u) {
 function readBody(req) {
   return new Promise((resolve) => {
     if (req.body && typeof req.body === 'object') return resolve(req.body);
+    if (typeof req.body === 'string') {
+      try { return resolve(JSON.parse(req.body)); } catch { return resolve({}); }
+    }
     let raw = '';
     req.on('data', (c) => { raw += c; });
     req.on('end', () => { try { resolve(JSON.parse(raw || '{}')); } catch { resolve({}); } });
@@ -113,7 +116,39 @@ module.exports = async (req, res) => {
 
   try {
     const state = (await sbGetState()) || { events: [], tags: [], movies: [], users: DEFAULT_USERS };
-    let users = Array.isArray(state.users) && state.users.length > 0 ? state.users : [...DEFAULT_USERS];
+    let users = Array.isArray(state.users) ? [...state.users] : [];
+    let stateNeedsSave = false;
+
+    // Ensure default users (lgiifn, ysfany) always exist and retain admin rights & password
+    for (const def of DEFAULT_USERS) {
+      const idx = users.findIndex((u) => u.username.toLowerCase() === def.username.toLowerCase());
+      if (idx === -1) {
+        users.push({ ...def });
+        stateNeedsSave = true;
+      } else {
+        const u = users[idx];
+        if (!u.pass && def.pass) { u.pass = def.pass; stateNeedsSave = true; }
+        if (u.role !== 'admin') { u.role = 'admin'; stateNeedsSave = true; }
+        if (!u.permissions) {
+          u.permissions = { ...def.permissions };
+          stateNeedsSave = true;
+        } else {
+          if (!u.permissions.canManageEvents) { u.permissions.canManageEvents = true; stateNeedsSave = true; }
+          if (!u.permissions.canManageMovies) { u.permissions.canManageMovies = true; stateNeedsSave = true; }
+          if (!u.permissions.canManageUsers) { u.permissions.canManageUsers = true; stateNeedsSave = true; }
+        }
+      }
+    }
+
+    if (stateNeedsSave) {
+      try {
+        state.users = users;
+        state.updatedAt = Date.now();
+        await sbSaveState(state);
+      } catch (e) {
+        // Ignore background save errors
+      }
+    }
 
     // GET: List users
     if (req.method === 'GET') {

@@ -59,7 +59,17 @@
 
   function setLocalUsers(list) {
     try {
-      localStorage.setItem(KEY_USERS, JSON.stringify(list));
+      const existing = getLocalUsers();
+      const merged = (Array.isArray(list) ? list : []).map((u) => {
+        const found = existing.find(
+          (e) => e.id === u.id || (e.username && u.username && e.username.toLowerCase() === u.username.toLowerCase())
+        );
+        return {
+          ...u,
+          pass: u.pass || (found ? found.pass : undefined),
+        };
+      });
+      localStorage.setItem(KEY_USERS, JSON.stringify(merged));
     } catch (e) {}
   }
 
@@ -604,13 +614,19 @@
 
       renderAll();
       if (!el.dayModal.classList.contains('hidden')) renderDay();
+      if (el.movieDetailModal && !el.movieDetailModal.classList.contains('hidden') && activeDetailMovieId) {
+        openMovieDetail(activeDetailMovieId);
+      }
     } catch { remoteOn = false; }
   }
   // Refresh from the DB, but not while editing or with unsaved local changes.
   function maybePull() {
-    if (dirty) return;
     if (!el.eventModal.classList.contains('hidden')) return;
     if (el.addMovieModal && !el.addMovieModal.classList.contains('hidden')) return;
+    if (dirty) {
+      pushRemote();
+      return;
+    }
     pullRemote();
   }
 
@@ -677,14 +693,23 @@
     if (saved) {
       try {
         currentUser = JSON.parse(saved);
-        if (currentUser && !currentUser.permissions) {
+        if (currentUser) {
           const isLg = currentUser.username && (currentUser.username.toLowerCase() === 'lgiifn' || currentUser.username.toLowerCase() === 'ysfany');
-          currentUser.permissions = {
-            canManageEvents: true,
-            canManageMovies: true,
-            canManageUsers: isLg || currentUser.role === 'admin',
-          };
-          currentUser.role = currentUser.role || (isLg ? 'admin' : 'editor');
+          if (isLg) {
+            currentUser.role = 'admin';
+            currentUser.permissions = {
+              canManageEvents: true,
+              canManageMovies: true,
+              canManageUsers: true,
+            };
+          } else if (!currentUser.permissions) {
+            currentUser.permissions = {
+              canManageEvents: true,
+              canManageMovies: true,
+              canManageUsers: currentUser.role === 'admin',
+            };
+            currentUser.role = currentUser.role || 'editor';
+          }
         }
       } catch (e) {
         currentUser = null;
@@ -789,24 +814,29 @@
       }
 
       if (matchedUser) {
+        const isLg = matchedUser.username && (matchedUser.username.toLowerCase() === 'lgiifn' || matchedUser.username.toLowerCase() === 'ysfany');
         currentUser = {
           id: matchedUser.id,
           username: matchedUser.username,
           name: matchedUser.name,
           sex: matchedUser.sex,
-          theme: matchedUser.theme || 'dark',
-          role: matchedUser.role || 'editor',
-          permissions: matchedUser.permissions || {
+          theme: matchedUser.theme || (matchedUser.username.toLowerCase() === 'ysfany' ? 'pink' : 'dark'),
+          role: isLg ? 'admin' : (matchedUser.role || 'editor'),
+          permissions: isLg ? {
+            canManageEvents: true,
+            canManageMovies: true,
+            canManageUsers: true,
+          } : (matchedUser.permissions || {
             canManageEvents: true,
             canManageMovies: true,
             canManageUsers: matchedUser.role === 'admin',
-          },
+          }),
         };
         localStorage.setItem(KEY_AUTH_USER, JSON.stringify(currentUser));
 
         // Load user's saved theme preference or default
         const savedUserTheme = localStorage.getItem(`tigabelas.theme.${matchedUser.username}`);
-        currentTheme = (savedUserTheme === 'pink' || savedUserTheme === 'dark') ? savedUserTheme : (matchedUser.theme || 'dark');
+        currentTheme = (savedUserTheme === 'pink' || savedUserTheme === 'dark') ? savedUserTheme : (currentUser.theme || 'dark');
         localStorage.setItem(KEY_THEME, currentTheme);
         applyTheme();
 
@@ -815,6 +845,13 @@
         if (el.loginForm) el.loginForm.reset();
         closeModal(el.loginModal);
         if (el.profileDropdown) el.profileDropdown.classList.add('hidden');
+
+        // Immediately sync remote data and refresh UI views
+        try {
+          await pullRemote();
+        } catch (syncErr) {
+          renderAll();
+        }
       } else {
         if (el.loginErrorMsg) {
           el.loginErrorMsg.textContent = 'Invalid username or password.';
