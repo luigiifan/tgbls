@@ -22,6 +22,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -30,12 +31,14 @@ body {
   color: var(--text-main);
   line-height: 1.5;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ==================== VIEW NAVIGATION ==================== */
 .view {
   display: none;
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
 }
 
@@ -1146,25 +1149,285 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-/* Responsive layout for mobile screens */
-@media (max-width: 480px) {
+/* ==================== MOBILE UI ENHANCEMENTS ==================== */
+@media (max-width: 640px) {
+  /* Home Page */
+  #view-home {
+    padding: 18px 14px;
+  }
+
+  .home-header {
+    margin-bottom: 22px;
+  }
+
+  .home-header h1 {
+    font-size: 1.45rem;
+  }
+
+  .home-header p {
+    font-size: 0.88rem;
+  }
+
   .menu-grid {
-    gap: 14px;
+    gap: 10px;
   }
 
   .menu-card {
-    padding: 22px 14px;
-    min-height: 144px;
+    padding: 18px 8px;
+    min-height: 138px;
+    border-radius: 14px;
+    gap: 10px;
   }
 
   .circle-progress,
   .circle-progress-svg {
-    width: 54px;
-    height: 54px;
+    width: 52px;
+    height: 52px;
+  }
+
+  .circle-progress-label {
+    font-size: 0.72rem;
   }
 
   .menu-title {
-    font-size: 1.02rem;
+    font-size: 0.94rem;
+  }
+
+  .available-now-badge {
+    padding: 4px 8px;
+    font-size: 0.68rem;
+  }
+
+  /* Inner Pages & Sticky Glass Header */
+  .page-wrapper {
+    padding: 16px 14px 96px;
+  }
+
+  .logbook-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: rgba(241, 245, 249, 0.9);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 8px 0 12px;
+    margin-bottom: 14px;
+    gap: 8px;
+  }
+
+  .header-center-title {
+    font-size: 1.25rem;
+  }
+
+  .btn-back {
+    padding: 7px 11px;
+    font-size: 0.82rem;
+    gap: 5px;
+    border-radius: 9px;
+  }
+
+  .btn-back .material-icons {
+    font-size: 18px;
+  }
+
+  .year-stepper {
+    padding: 3px 4px;
+    gap: 2px;
+    border-radius: 9px;
+  }
+
+  .btn-year-arrow {
+    width: 28px;
+    height: 28px;
+  }
+
+  .btn-year-arrow .material-icons {
+    font-size: 20px;
+  }
+
+  .year-number {
+    min-width: 44px;
+    font-size: 0.9rem;
+  }
+
+  .header-month-box {
+    padding: 6px 12px;
+    font-size: 0.84rem;
+    border-radius: 9px;
+  }
+
+  /* MyEvent Month Accordion & Event Cards */
+  .month-list {
+    gap: 10px;
+  }
+
+  .month-dropdown-btn {
+    padding: 14px 16px;
+  }
+
+  .month-name {
+    font-size: 0.96rem;
+  }
+
+  .month-content {
+    padding: 12px;
+  }
+
+  .event-card {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .event-title {
+    font-size: 0.92rem;
+  }
+
+  .event-desc {
+    font-size: 0.82rem;
+  }
+
+  .event-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .btn-event-action {
+    justify-content: center;
+    padding: 6px 10px;
+    font-size: 0.76rem;
+  }
+
+  .btn-fab-add {
+    right: 16px;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    padding: 12px 16px;
+    font-size: 0.88rem;
+    border-radius: 11px;
+  }
+
+  /* MyWish Form */
+  .wish-form-card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .wish-form-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-wish-submit {
+    width: 100%;
+    padding: 12px;
+  }
+
+  /* MyRecap 1x3 Grid, Days Progress & Details */
+  .recap-grid {
+    gap: 10px;
+  }
+
+  .recap-card {
+    padding: 16px 8px;
+    border-radius: 14px;
+    gap: 6px;
+  }
+
+  .recap-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    margin-bottom: 2px;
+  }
+
+  .recap-icon .material-icons {
+    font-size: 21px;
+  }
+
+  .recap-value {
+    font-size: 1.35rem;
+  }
+
+  .recap-target {
+    font-size: 0.82rem;
+  }
+
+  .recap-label {
+    font-size: 0.74rem;
+    line-height: 1.25;
+  }
+
+  .recap-days-card,
+  .recap-detail-card {
+    margin-top: 12px;
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .recap-days-header {
+    gap: 8px;
+  }
+
+  .recap-days-title-group .recap-label {
+    font-size: 0.8rem;
+    text-align: left;
+  }
+
+  .recap-days-value {
+    font-size: 1.05rem;
+    flex-shrink: 0;
+  }
+
+  .recap-detail-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    padding: 10px 12px;
+  }
+
+  .recap-detail-value {
+    text-align: left;
+    font-size: 0.88rem;
+  }
+
+  /* Bottom-Sheet Modals on Mobile */
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-card {
+    max-width: 100%;
+    border-radius: 18px 18px 0 0;
+    padding: 22px 18px max(22px, env(safe-area-inset-bottom));
+  }
+
+  .form-group input,
+  .form-group textarea {
+    font-size: 16px;
+  }
+
+  .modal-actions {
+    gap: 10px;
+  }
+
+  .btn-modal-cancel,
+  .btn-modal-save,
+  #wish-confirm-backdrop .btn-wish-submit {
+    flex: 1;
+    padding: 11px 16px;
+    text-align: center;
+  }
+}
+
+/* Compact header back button on very narrow screens */
+@media (max-width: 400px) {
+  .logbook-header .btn-back span:not(.material-icons) {
+    display: none;
+  }
+
+  .logbook-header .btn-back {
+    padding: 8px 10px;
   }
 }
 
