@@ -7,72 +7,7 @@
 const STORE_PATH = 'store.json';
 
 const DEFAULT_STORE_DATA = {
-  events: [
-    {
-      id: 'EVT-2025-001',
-      year: 2025,
-      month: 1,
-      date: '2025-01-06',
-      title: 'Annual Opening & Planning Meeting',
-      description: 'Preparing the operational activity schedule for the first half of 2025.'
-    },
-    {
-      id: 'EVT-2025-002',
-      year: 2025,
-      month: 1,
-      date: '2025-01-18',
-      title: 'Equipment Inventory & Calibration Check',
-      description: 'Inspecting core device readiness and recording baseline log entries.'
-    },
-    {
-      id: 'EVT-2025-003',
-      year: 2025,
-      month: 2,
-      date: '2025-02-12',
-      title: 'Standard Operating Procedure (SOP) Training',
-      description: 'Briefing team members on the updated event logging format.'
-    },
-    {
-      id: 'EVT-2026-001',
-      year: 2026,
-      month: 1,
-      date: '2026-01-05',
-      title: 'Annual Planning & Kick-off Meeting',
-      description: 'Setting annual objectives and assigning responsibilities across the team.'
-    },
-    {
-      id: 'EVT-2026-002',
-      year: 2026,
-      month: 1,
-      date: '2026-01-14',
-      title: 'Early Year Equipment Inspection & Calibration',
-      description: 'Checking primary hardware status and recording initial log data.'
-    },
-    {
-      id: 'EVT-2026-003',
-      year: 2026,
-      month: 1,
-      date: '2026-01-27',
-      title: 'Weekly Evaluation & Data Synchronization',
-      description: 'Reviewing January milestones and validating logbook entries.'
-    },
-    {
-      id: 'EVT-2026-004',
-      year: 2026,
-      month: 2,
-      date: '2026-02-10',
-      title: 'Routine System Maintenance & Backup',
-      description: 'Scheduled server maintenance and monthly database backup.'
-    },
-    {
-      id: 'EVT-2026-005',
-      year: 2026,
-      month: 11,
-      date: '2026-11-13',
-      title: 'Web & Kodular Mobile API Integration Test',
-      description: 'Testing JSON payload structure for REST API sync with the Android app.'
-    }
-  ],
+  events: [],
   wishes: {},
   recap: {
     stats: {

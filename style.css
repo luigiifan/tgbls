@@ -303,8 +303,9 @@ body {
   font-weight: 700;
 }
 
-/* Year Selector with Previous & Next Arrow Buttons */
+/* Year Selector: Prev & Next Arrows on Desktop, Clickable Year Dropdown on Mobile */
 .year-stepper {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -346,10 +347,55 @@ body {
 .year-number {
   min-width: 56px;
   text-align: center;
+  font-family: inherit;
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-main);
+  background: transparent;
+  border: none;
   user-select: none;
+  cursor: default;
+}
+
+.year-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 96px;
+  max-height: 220px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: var(--shadow-md);
+  z-index: 250;
+}
+
+.year-dropdown-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-main);
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.year-dropdown-item:hover {
+  background-color: #f1f5f9;
+}
+
+.year-dropdown-item.active {
+  background-color: var(--accent-blue);
+  color: #ffffff;
 }
 
 /* ==================== MONTH DROPDOWN LIST (JANUARY - DECEMBER) ==================== */
@@ -816,6 +862,35 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
+@keyframes spinSync {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.sync-loading-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 32px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--accent-blue);
+  font-size: 0.94rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.sync-spinner {
+  font-size: 22px;
+  animation: spinSync 1s linear infinite;
+}
+
 /* ==================== MYWISH FORM CARD ==================== */
 .wish-form-card {
   background: var(--bg-card);
@@ -1231,23 +1306,25 @@ body {
   }
 
   .year-stepper {
-    padding: 3px 4px;
-    gap: 2px;
+    padding: 0;
+    gap: 0;
     border-radius: 9px;
   }
 
   .btn-year-arrow {
-    width: 28px;
-    height: 28px;
-  }
-
-  .btn-year-arrow .material-icons {
-    font-size: 20px;
+    display: none;
   }
 
   .year-number {
-    min-width: 44px;
+    min-width: 64px;
+    padding: 7px 14px;
     font-size: 0.9rem;
+    border-radius: 9px;
+    cursor: pointer;
+  }
+
+  .year-stepper.dropdown-open .year-dropdown-menu {
+    display: block;
   }
 
   .header-month-box {

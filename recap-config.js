@@ -4,10 +4,10 @@
  */
 const RECAP_CONFIG = {
   stats: {
-    totalMovies: 12,
+    totalMovies: 0,
     targetMovies: 15,
-    totalMemories: 24,
-    targetMemories: 30
+    totalMemories: 0,
+    targetMemories: 5
   },
   highlights: {
     bestEvent: 'Annual Planning & Kick-off Meeting',

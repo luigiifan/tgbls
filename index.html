@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TGBLS - MyEvent</title>
+  <title>tigabelas</title>
   <!-- Google Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
@@ -15,8 +15,8 @@
     <section id="view-home" class="view active">
       <div class="home-wrapper">
         <header class="home-header">
-          <h1>Main Dashboard</h1>
-          <p>Select a menu to manage your activities and records</p>
+          <h1>MyDashboard</h1>
+          <p>Select a menu to manage our activities and records</p>
         </header>
 
         <!-- Centered 1x3 Horizontal Grid -->
@@ -51,15 +51,16 @@
 
           <h1 class="header-center-title">MyEvent</h1>
 
-          <!-- Year Selector with Previous & Next Arrow Buttons -->
-          <div class="year-stepper" aria-label="Select Year">
+          <!-- Year Selector: Prev/Next Arrows on Desktop, Clickable Year Dropdown on Mobile -->
+          <div id="year-stepper" class="year-stepper" aria-label="Select Year">
             <button id="btn-prev-year" class="btn-year-arrow" type="button" title="Previous Year">
               <span class="material-icons">chevron_left</span>
             </button>
-            <span id="year-display" class="year-number">2026</span>
+            <button id="year-display" class="year-number" type="button" aria-expanded="false">2026</button>
             <button id="btn-next-year" class="btn-year-arrow" type="button" title="Next Year">
               <span class="material-icons">chevron_right</span>
             </button>
+            <ul id="year-dropdown-menu" class="year-dropdown-menu" role="listbox"></ul>
           </div>
         </header>
 
@@ -281,12 +282,12 @@
     <!-- ==================== MYWISH LOCKED INFO MODAL ==================== -->
     <div id="wish-locked-backdrop" class="modal-backdrop" aria-hidden="true">
       <div class="modal-card" role="dialog" aria-labelledby="wish-locked-title">
-        <h3 id="wish-locked-title">MyWish Locked</h3>
+        <h3 id="wish-locked-title">Coming Soon!</h3>
         <p id="wish-locked-message" class="modal-confirm-text">
           MyWish is currently locked until the end of the month.
         </p>
         <div class="modal-actions">
-          <button type="button" id="btn-wish-locked-close" class="btn-modal-save">OK</button>
+          <button type="button" id="btn-wish-locked-close" class="btn-modal-save">CLOSE</button>
         </div>
       </div>
     </div>

@@ -26,7 +26,7 @@ const MAX_DESC_LENGTH = 100;
 const MAX_WISH_WORDS = 500;
 const HOLD_DELETE_DURATION_MS = 2000;
 const GLOBAL_STORE_ENDPOINT = '/api/store';
-const LOCAL_STORAGE_KEY = 'tgbls_global_store_v1';
+const LOCAL_STORAGE_KEY = 'tgbls_global_store_v2';
 let WISH_DATA = {};
 let globalRecapConfig = typeof RECAP_CONFIG !== 'undefined' ? RECAP_CONFIG : { stats: {}, highlights: {} };
 let selectedYear = Math.max(MIN_YEAR, new Date().getFullYear());
@@ -37,80 +37,11 @@ let selectedYear = Math.max(MIN_YEAR, new Date().getFullYear());
 const openMonthsState = new Set();
 
 /**
- * Sample Event Log Data (Standard REST API JSON structure)
- * Ready to sync with a REST API backend for both Web and Kodular Android app.
+ * Event Log Data (starts empty and syncs from database)
  */
 const SAMPLE_LOGBOOK_DATA = {
   status: 'success',
-  events: [
-    // Sample Data for 2025
-    {
-      id: 'EVT-2025-001',
-      year: 2025,
-      month: 1,
-      date: '2025-01-06',
-      title: 'Annual Opening & Planning Meeting',
-      description: 'Preparing the operational activity schedule for the first half of 2025.'
-    },
-    {
-      id: 'EVT-2025-002',
-      year: 2025,
-      month: 1,
-      date: '2025-01-18',
-      title: 'Equipment Inventory & Calibration Check',
-      description: 'Inspecting core device readiness and recording baseline log entries.'
-    },
-    {
-      id: 'EVT-2025-003',
-      year: 2025,
-      month: 2,
-      date: '2025-02-12',
-      title: 'Standard Operating Procedure (SOP) Training',
-      description: 'Briefing team members on the updated event logging format.'
-    },
-
-    // Sample Data for 2026
-    {
-      id: 'EVT-2026-001',
-      year: 2026,
-      month: 1,
-      date: '2026-01-05',
-      title: 'Annual Planning & Kick-off Meeting',
-      description: 'Setting annual objectives and assigning responsibilities across the team.'
-    },
-    {
-      id: 'EVT-2026-002',
-      year: 2026,
-      month: 1,
-      date: '2026-01-14',
-      title: 'Early Year Equipment Inspection & Calibration',
-      description: 'Checking primary hardware status and recording initial log data.'
-    },
-    {
-      id: 'EVT-2026-003',
-      year: 2026,
-      month: 1,
-      date: '2026-01-27',
-      title: 'Weekly Evaluation & Data Synchronization',
-      description: 'Reviewing January milestones and validating logbook entries.'
-    },
-    {
-      id: 'EVT-2026-004',
-      year: 2026,
-      month: 2,
-      date: '2026-02-10',
-      title: 'Routine System Maintenance & Backup',
-      description: 'Scheduled server maintenance and monthly database backup.'
-    },
-    {
-      id: 'EVT-2026-005',
-      year: 2026,
-      month: 11,
-      date: '2026-11-13',
-      title: 'Web & Kodular Mobile API Integration Test',
-      description: 'Testing JSON payload structure for REST API sync with the Android app.'
-    }
-  ]
+  events: []
 };
 
 /**
@@ -148,18 +79,56 @@ function parseDisplayDateToIso(displayDate) {
 }
 
 /**
- * Initializes the year selector with Previous & Next arrow buttons
+ * Initializes the year selector:
+ * - Desktop: Previous & Next arrow buttons
+ * - Mobile: Clickable year button that opens a year dropdown list
  */
 function setupYearStepper() {
+  const stepperEl = document.getElementById('year-stepper');
   const prevBtn = document.getElementById('btn-prev-year');
   const nextBtn = document.getElementById('btn-next-year');
   const yearDisplay = document.getElementById('year-display');
+  const dropdownMenu = document.getElementById('year-dropdown-menu');
 
   if (!prevBtn || !nextBtn || !yearDisplay) return;
+
+  function closeYearDropdown() {
+    if (!stepperEl) return;
+    stepperEl.classList.remove('dropdown-open');
+    yearDisplay.setAttribute('aria-expanded', 'false');
+  }
+
+  function renderYearDropdownItems() {
+    if (!dropdownMenu) return;
+    const maxYear = Math.max(selectedYear + 4, new Date().getFullYear() + 4, 2030);
+    dropdownMenu.innerHTML = '';
+
+    for (let yr = MIN_YEAR; yr <= maxYear; yr++) {
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = yr === selectedYear ? 'year-dropdown-item active' : 'year-dropdown-item';
+      btn.textContent = String(yr);
+      btn.setAttribute('role', 'option');
+      btn.setAttribute('aria-selected', String(yr === selectedYear));
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectedYear = yr;
+        updateYearUI();
+        closeYearDropdown();
+        renderLogbookAccordion();
+      });
+
+      li.appendChild(btn);
+      dropdownMenu.appendChild(li);
+    }
+  }
 
   function updateYearUI() {
     yearDisplay.textContent = String(selectedYear);
     prevBtn.disabled = selectedYear <= MIN_YEAR;
+    renderYearDropdownItems();
   }
 
   prevBtn.addEventListener('click', () => {
@@ -174,6 +143,19 @@ function setupYearStepper() {
     selectedYear += 1;
     updateYearUI();
     renderLogbookAccordion();
+  });
+
+  yearDisplay.addEventListener('click', (e) => {
+    if (!window.matchMedia('(max-width: 640px)').matches || !stepperEl) return;
+    e.stopPropagation();
+    const isOpen = stepperEl.classList.toggle('dropdown-open');
+    yearDisplay.setAttribute('aria-expanded', String(isOpen));
+  });
+
+  document.addEventListener('click', (e) => {
+    if (stepperEl && !stepperEl.contains(e.target)) {
+      closeYearDropdown();
+    }
   });
 
   updateYearUI();
@@ -1102,7 +1084,29 @@ function renderMyRecap() {
 }
 
 /**
- * Handles navigation between pages (Home, MyEvent, MyWish, MyRecap, MyProfile)
+ * Shows a loading status inside MyEvent while syncing with the database, then renders events
+ */
+async function syncMyEventFromDatabase() {
+  const container = document.getElementById('month-accordion-list');
+  if (container) {
+    container.innerHTML = `
+      <div class="sync-loading-card" role="status" aria-live="polite">
+        <span class="material-icons sync-spinner" aria-hidden="true">sync</span>
+        <span>Syncing events with database...</span>
+      </div>
+    `;
+  }
+
+  await Promise.all([
+    loadGlobalStore(),
+    new Promise((resolve) => setTimeout(resolve, 400))
+  ]);
+
+  renderLogbookAccordion();
+}
+
+/**
+ * Handles navigation between pages (Home, MyEvent, MyWish, MyRecap)
  */
 function setupNavigation() {
   const navButtons = document.querySelectorAll('[data-target]');
@@ -1124,6 +1128,8 @@ function setupNavigation() {
       });
       if (targetId === 'view-home') {
         renderHomeMenuProgress();
+      } else if (targetId === 'view-myevent') {
+        syncMyEventFromDatabase();
       } else if (targetId === 'view-myrecap') {
         renderMyRecap();
       }
