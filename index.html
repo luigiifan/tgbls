@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TGBLS - MyEvent</title>
+  <!-- Google Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- ==================== HOME PAGE ==================== -->
+    <section id="view-home" class="view active">
+      <div class="home-wrapper">
+        <header class="home-header">
+          <h1>Main Dashboard</h1>
+          <p>Select a menu to manage your activities and records</p>
+        </header>
+
+        <!-- Centered 1x3 Horizontal Grid -->
+        <div class="menu-grid">
+          <button class="menu-card" data-target="view-myevent" type="button">
+            <div id="myevent-progress" class="menu-progress-wrapper"></div>
+            <span class="menu-title">MyEvent</span>
+          </button>
+
+          <button id="btn-menu-mywish" class="menu-card" data-target="view-mywish" type="button">
+            <div id="mywish-progress" class="menu-progress-wrapper"></div>
+            <span class="menu-title">MyWish</span>
+            <div id="mywish-available" class="menu-available-wrapper"></div>
+          </button>
+
+          <button class="menu-card" data-target="view-myrecap" type="button">
+            <div id="myrecap-progress" class="menu-progress-wrapper"></div>
+            <span class="menu-title">MyRecap</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== MYEVENT PAGE ==================== -->
+    <section id="view-myevent" class="view">
+      <div class="page-wrapper">
+        <header class="page-header logbook-header">
+          <button class="btn-back" data-target="view-home" type="button">
+            <span class="material-icons">arrow_back</span>
+            <span>Main Menu</span>
+          </button>
+
+          <h1 class="header-center-title">MyEvent</h1>
+
+          <!-- Year Selector with Previous & Next Arrow Buttons -->
+          <div class="year-stepper" aria-label="Select Year">
+            <button id="btn-prev-year" class="btn-year-arrow" type="button" title="Previous Year">
+              <span class="material-icons">chevron_left</span>
+            </button>
+            <span id="year-display" class="year-number">2026</span>
+            <button id="btn-next-year" class="btn-year-arrow" type="button" title="Next Year">
+              <span class="material-icons">chevron_right</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- Vertical Month Dropdown List -->
+        <div id="month-accordion-list" class="month-list">
+          <!-- Dynamically rendered by app.js -->
+        </div>
+      </div>
+
+      <!-- Floating Add Event Button at Bottom Right -->
+      <button id="btn-add-event" class="btn-fab-add" type="button" title="Add Event">
+        <span class="material-icons">add</span>
+        <span>Add Event</span>
+      </button>
+    </section>
+
+    <!-- ==================== MYWISH PAGE ==================== -->
+    <section id="view-mywish" class="view">
+      <div class="page-wrapper">
+        <header class="page-header logbook-header">
+          <button class="btn-back" data-target="view-home" type="button">
+            <span class="material-icons">arrow_back</span>
+            <span>Main Menu</span>
+          </button>
+          <h1 class="header-center-title">MyWish</h1>
+          <div class="header-month-box" aria-label="Current Month">
+            <span id="wish-month-label">November</span>
+          </div>
+        </header>
+
+        <div class="wish-form-card">
+          <form id="wish-form">
+            <div class="form-group">
+              <div class="label-row">
+                <label for="wish-accomplished">1. What has he accomplished this month?</label>
+                <span id="wish-accomplished-counter" class="char-counter">0 / 500 words</span>
+              </div>
+              <textarea
+                id="wish-accomplished"
+                rows="5"
+                placeholder="Write what he has accomplished this month (up to 500 words)..."
+                required
+              ></textarea>
+            </div>
+
+            <div class="form-group">
+              <div class="label-row">
+                <label for="wish-improve">2. What does he need to improve next month?</label>
+                <span id="wish-improve-counter" class="char-counter">0 / 500 words</span>
+              </div>
+              <textarea
+                id="wish-improve"
+                rows="5"
+                placeholder="Write what he needs to improve next month (up to 500 words)..."
+                required
+              ></textarea>
+            </div>
+
+            <div class="wish-form-footer">
+              <span id="wish-status-msg" class="wish-status-msg" aria-live="polite"></span>
+              <button type="submit" id="btn-wish-submit" class="btn-wish-submit">Submit</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== MYRECAP PAGE ==================== -->
+    <section id="view-myrecap" class="view">
+      <div class="page-wrapper">
+        <header class="page-header logbook-header">
+          <button class="btn-back" data-target="view-home" type="button">
+            <span class="material-icons">arrow_back</span>
+            <span>Main Menu</span>
+          </button>
+          <h1 class="header-center-title">MyRecap</h1>
+          <div class="header-month-box" aria-label="Current Year">
+            <span id="recap-year-label">2026</span>
+          </div>
+        </header>
+
+        <!-- 1x3 Recap Grid Container -->
+        <div class="recap-grid">
+          <div class="recap-card">
+            <div class="recap-icon recap-icon-blue">
+              <span class="material-icons">event_note</span>
+            </div>
+            <span id="recap-total-events" class="recap-value">0</span>
+            <span class="recap-label">Events</span>
+          </div>
+
+          <div class="recap-card">
+            <div class="recap-icon recap-icon-emerald">
+              <span class="material-icons">movie</span>
+            </div>
+            <span id="recap-total-movies" class="recap-value">0</span>
+            <span class="recap-label">Movies</span>
+          </div>
+
+          <div class="recap-card">
+            <div class="recap-icon recap-icon-amber">
+              <span class="material-icons">photo_library</span>
+            </div>
+            <span id="recap-total-memories" class="recap-value">0</span>
+            <span class="recap-label">Memories</span>
+          </div>
+        </div>
+
+        <!-- Days Progress Bar Container (below 1x3 grid) -->
+        <div class="recap-days-card">
+          <div class="recap-days-header">
+            <div class="recap-days-title-group">
+              <div class="recap-icon recap-icon-purple recap-icon-sm">
+                <span class="material-icons">bolt</span>
+              </div>
+              <span class="recap-label">Total Days in Years</span>
+            </div>
+            <span id="recap-days-percent" class="recap-days-value">0.0%</span>
+          </div>
+
+          <div class="recap-progress-track">
+            <div id="recap-days-fill" class="recap-progress-fill" style="--days-progress: 0%;"></div>
+            <span class="recap-progress-divider" style="left: 10%;" aria-hidden="true"></span>
+            <span class="recap-progress-divider" style="left: 50%;" aria-hidden="true"></span>
+            <span class="recap-progress-divider" style="left: 90%;" aria-hidden="true"></span>
+          </div>
+
+          <div class="recap-progress-scale">
+            <span class="scale-mark" style="left: 10%;">10%</span>
+            <span class="scale-mark" style="left: 50%;">50%</span>
+            <span class="scale-mark" style="left: 90%;">90%</span>
+          </div>
+        </div>
+
+        <!-- Full-Width Recap Details Container -->
+        <div id="recap-detail-card" class="recap-detail-card">
+          <div class="recap-detail-header">
+            <div class="recap-detail-title-group">
+              <div class="recap-icon recap-icon-blue recap-icon-sm">
+                <span class="material-icons">list_alt</span>
+              </div>
+              <h2 class="recap-detail-title">End Year's Recap</h2>
+            </div>
+            <span id="recap-detail-status" class="recap-detail-status"></span>
+          </div>
+          <ul id="recap-detail-list" class="recap-detail-list">
+            <!-- Populated by app.js using recap-config.js -->
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== ADD / EDIT EVENT MODAL ==================== -->
+    <div id="edit-modal-backdrop" class="modal-backdrop" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-labelledby="modal-edit-title">
+        <h3 id="modal-edit-title">Edit Event</h3>
+        <form id="edit-event-form">
+          <input type="hidden" id="edit-event-id" />
+          <div class="form-group">
+            <div class="label-row">
+              <label for="edit-event-title">Event Title</label>
+              <span id="edit-title-counter" class="char-counter">0 / 50</span>
+            </div>
+            <input type="text" id="edit-event-title" maxlength="50" placeholder="Enter event title" required />
+          </div>
+          <div class="form-group">
+            <label for="edit-event-date">Event Date</label>
+            <div class="date-input-wrapper">
+              <input
+                type="text"
+                id="edit-event-date"
+                placeholder="DD/MM/YYYY"
+                maxlength="10"
+                pattern="\d{2}/\d{2}/\d{4}"
+                inputmode="numeric"
+                required
+              />
+              <button type="button" id="btn-open-calendar" class="date-picker-trigger" title="Select Date">
+                <span class="material-icons">calendar_today</span>
+                <input
+                  type="date"
+                  id="edit-event-date-picker"
+                  class="native-date-overlay"
+                  aria-label="Select date from calendar"
+                  tabindex="-1"
+                />
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="label-row">
+              <label for="edit-event-desc">Description</label>
+              <span id="edit-desc-counter" class="char-counter">0 / 100</span>
+            </div>
+            <textarea id="edit-event-desc" rows="3" maxlength="100" placeholder="Enter event description"></textarea>
+          </div>
+          <div class="modal-actions">
+            <button type="button" id="btn-cancel-edit" class="btn-modal-cancel">Cancel</button>
+            <button type="submit" class="btn-modal-save">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ==================== MYWISH SUBMIT CONFIRMATION MODAL ==================== -->
+    <div id="wish-confirm-backdrop" class="modal-backdrop" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-labelledby="wish-confirm-title">
+        <h3 id="wish-confirm-title">Confirm Submission</h3>
+        <p id="wish-confirm-message" class="modal-confirm-text">
+          Once submitted, your wish for this month cannot be edited or changed. Are you sure you want to submit?
+        </p>
+        <div class="modal-actions">
+          <button type="button" id="btn-wish-confirm-cancel" class="btn-modal-cancel">Cancel</button>
+          <button type="button" id="btn-wish-confirm-ok" class="btn-wish-submit">Confirm Submit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MYWISH LOCKED INFO MODAL ==================== -->
+    <div id="wish-locked-backdrop" class="modal-backdrop" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-labelledby="wish-locked-title">
+        <h3 id="wish-locked-title">MyWish Locked</h3>
+        <p id="wish-locked-message" class="modal-confirm-text">
+          MyWish is currently locked until the end of the month.
+        </p>
+        <div class="modal-actions">
+          <button type="button" id="btn-wish-locked-close" class="btn-modal-save">OK</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="recap-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

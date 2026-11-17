@@ -1,0 +1,1170 @@
+:root {
+  --bg-primary: #f1f5f9;
+  --bg-card: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+  --accent-blue: #2563eb;
+  --accent-blue-soft: #dbeafe;
+  --accent-emerald: #059669;
+  --accent-emerald-soft: #d1fae5;
+  --accent-amber: #d97706;
+  --accent-amber-soft: #fef3c7;
+  --accent-purple: #7c3aed;
+  --accent-purple-soft: #ede9fe;
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 4px 10px -3px rgba(15, 23, 42, 0.04);
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ==================== VIEW NAVIGATION ==================== */
+.view {
+  display: none;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.view.active {
+  display: flex;
+}
+
+/* ==================== HOME PAGE (CENTERED 1x3 HORIZONTAL GRID) ==================== */
+#view-home {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.home-wrapper {
+  width: 100%;
+  max-width: 720px;
+  text-align: center;
+}
+
+.home-header {
+  margin-bottom: 28px;
+}
+
+.home-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+
+.home-header p {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.menu-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 28px 20px;
+  min-height: 164px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  text-align: center;
+}
+
+.menu-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: #cbd5e1;
+}
+
+.menu-card:active {
+  transform: translateY(-1px);
+}
+
+.menu-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.menu-subtitle {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* Home Menu Circular Progress Indicators (placed above the title) */
+.menu-progress-wrapper {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circle-progress {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circle-progress-svg {
+  width: 64px;
+  height: 64px;
+  transform: rotate(-90deg);
+}
+
+.circle-progress-track {
+  fill: none;
+  stroke: #e2e8f0;
+  stroke-width: 6;
+}
+
+.circle-progress-fill {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.35s ease;
+}
+
+.circle-progress-fill.stroke-blue {
+  stroke: var(--accent-blue);
+}
+
+.circle-progress-fill.stroke-emerald {
+  stroke: var(--accent-emerald);
+}
+
+.circle-progress-fill.stroke-amber {
+  stroke: var(--accent-amber);
+}
+
+.circle-progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 0.01em;
+}
+
+/* Available Now container for MyWish when countdown finishes */
+@keyframes availableBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.menu-available-wrapper {
+  width: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.available-now-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  background-color: #dc2626;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 6px;
+  animation: availableBlink 1s ease-in-out infinite;
+}
+
+/* ==================== INNER PAGES (MYEVENT & OTHERS) ==================== */
+.page-wrapper {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px 20px 96px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* MyEvent Header: Back Button (left), MyEvent (center), Year Selector (right) */
+.logbook-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.logbook-header .btn-back {
+  justify-self: start;
+}
+
+.header-center-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.logbook-header .year-stepper,
+.logbook-header .header-month-box {
+  justify-self: end;
+}
+
+.header-month-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
+  user-select: none;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-back .material-icons {
+  font-size: 20px;
+}
+
+.btn-back:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.page-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-title-group h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+/* Year Selector with Previous & Next Arrow Buttons */
+.year-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 4px 6px;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-year-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-year-arrow .material-icons {
+  font-size: 22px;
+}
+
+.btn-year-arrow:hover:not(:disabled) {
+  background-color: var(--accent-blue-soft);
+  color: var(--accent-blue);
+}
+
+.btn-year-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.year-number {
+  min-width: 56px;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  user-select: none;
+}
+
+/* ==================== MONTH DROPDOWN LIST (JANUARY - DECEMBER) ==================== */
+.month-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.month-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.month-item.open {
+  border-color: #cbd5e1;
+  box-shadow: var(--shadow-md);
+}
+
+.month-dropdown-btn {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.month-dropdown-btn:hover {
+  background-color: #f8fafc;
+}
+
+/* Month label + event count badge right beside it */
+.month-label-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.month-name {
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* Event count indicator beside the month name (rounded box, not circle) */
+.event-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 6px;
+  background-color: var(--accent-blue-soft);
+  color: var(--accent-blue);
+}
+
+/* Active (current) month: blue */
+.event-count-badge.is-current {
+  background-color: var(--accent-blue);
+  color: #ffffff;
+}
+
+/* Past months: gray */
+.event-count-badge.is-past {
+  background-color: #e2e8f0;
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* Empty upcoming month */
+.event-count-badge.empty {
+  background-color: #e2e8f0;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.dropdown-arrow {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  transition: transform 0.25s ease, color 0.2s ease;
+}
+
+.dropdown-arrow .material-icons {
+  font-size: 22px;
+}
+
+.month-item.open .dropdown-arrow {
+  transform: rotate(180deg);
+  color: var(--text-main);
+}
+
+/* Dropdown content panel */
+.month-content {
+  display: none;
+  border-top: 1px solid var(--border-color);
+  background-color: #f8fafc;
+  padding: 16px 20px;
+}
+
+.month-item.open .month-content {
+  display: block;
+}
+
+/* Event list inside month */
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+}
+
+.event-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.event-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.event-title {
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Date placed directly below event title */
+.event-date {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-blue);
+  background-color: var(--accent-blue-soft);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.event-desc {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Edit & Delete buttons centered vertically on the right side */
+.event-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-event-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 11px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-event-action .material-icons {
+  font-size: 16px;
+}
+
+.btn-event-action:active {
+  transform: scale(0.97);
+}
+
+.btn-event-edit {
+  background-color: #ecfdf5;
+  color: var(--accent-emerald);
+  border-color: #a7f3d0;
+}
+
+.btn-event-edit:hover {
+  background-color: var(--accent-emerald-soft);
+  border-color: #6ee7b7;
+}
+
+.btn-event-delete {
+  position: relative;
+  background-color: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.btn-event-delete:hover {
+  background-color: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.btn-event-delete.is-holding {
+  background-color: #fee2e2;
+}
+
+/* SVG outline progress indicator around Delete button during 2s hold */
+.delete-hold-outline {
+  position: absolute;
+  inset: -1px;
+  width: calc(100% + 2px);
+  height: calc(100% + 2px);
+  pointer-events: none;
+  overflow: visible;
+}
+
+.delete-hold-rect {
+  fill: none;
+  stroke: #dc2626;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  opacity: 0;
+}
+
+.btn-event-delete.is-holding .delete-hold-rect {
+  opacity: 1;
+}
+
+.no-event-message {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 8px 0;
+}
+
+/* ==================== ADD / EDIT EVENT MODAL ==================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.modal-backdrop.active {
+  display: flex;
+}
+
+.modal-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  box-shadow: var(--shadow-md);
+}
+
+.modal-card h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.char-counter {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.char-counter.at-limit {
+  color: #dc2626;
+}
+
+.form-group input,
+.form-group textarea {
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 9px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-main);
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+
+/* DD/MM/YYYY date input with calendar selector */
+.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.date-input-wrapper input[type="text"] {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.date-picker-trigger {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background-color: transparent;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.date-picker-trigger:hover {
+  background-color: #f1f5f9;
+  color: var(--accent-blue);
+}
+
+.date-picker-trigger .material-icons {
+  font-size: 18px;
+  pointer-events: none;
+}
+
+.native-date-overlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  border: none;
+  padding: 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.btn-modal-cancel {
+  background: #f1f5f9;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-modal-save {
+  background: var(--accent-blue);
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ==================== FLOATING ADD EVENT BUTTON (BOTTOM RIGHT) ==================== */
+.btn-fab-add {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--accent-blue);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 13px 18px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.4), 0 4px 10px -3px rgba(15, 23, 42, 0.15);
+  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-fab-add .material-icons {
+  font-size: 20px;
+}
+
+.btn-fab-add:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-2px);
+}
+
+.btn-fab-add:active {
+  transform: translateY(0);
+}
+
+.empty-year-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 36px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ==================== MYWISH FORM CARD ==================== */
+.wish-form-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.wish-form-card textarea {
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.6;
+}
+
+.wish-form-card textarea:read-only,
+.wish-form-card textarea:disabled {
+  background-color: #f8fafc;
+  color: var(--text-muted);
+  cursor: not-allowed;
+  resize: none;
+}
+
+.wish-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.wish-status-msg {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-emerald);
+}
+
+.btn-wish-submit {
+  background-color: var(--accent-emerald);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 22px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-wish-submit:hover:not(:disabled) {
+  background-color: #047857;
+}
+
+.btn-wish-submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-wish-submit:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.modal-confirm-text {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ==================== MYRECAP 1x3 GRID & DAYS PROGRESS ==================== */
+.recap-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.recap-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.recap-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.recap-icon .material-icons {
+  font-size: 26px;
+}
+
+.recap-icon-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  margin-bottom: 0;
+}
+
+.recap-icon-sm .material-icons {
+  font-size: 20px;
+}
+
+.recap-icon-blue {
+  background-color: var(--accent-blue-soft);
+  color: var(--accent-blue);
+}
+
+.recap-icon-emerald {
+  background-color: var(--accent-emerald-soft);
+  color: var(--accent-emerald);
+}
+
+.recap-icon-amber {
+  background-color: var(--accent-amber-soft);
+  color: var(--accent-amber);
+}
+
+.recap-icon-purple {
+  background-color: var(--accent-purple-soft);
+  color: var(--accent-purple);
+}
+
+.recap-value {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.1;
+}
+
+.recap-target {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.recap-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Days Progress Container below 1x3 Grid */
+.recap-days-card {
+  margin-top: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.recap-days-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.recap-days-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.recap-days-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.recap-progress-track {
+  position: relative;
+  width: 100%;
+  height: 16px;
+  background-color: #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Segmented multi-color progress fill: 0-10% yellow, 10-90% purple, 90-100% green */
+.recap-progress-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(
+    to right,
+    #eab308 0%,
+    #eab308 10%,
+    var(--accent-purple) 10%,
+    var(--accent-purple) 90%,
+    var(--accent-emerald) 90%,
+    var(--accent-emerald) 100%
+  );
+  clip-path: inset(0 calc(100% - var(--days-progress, 0%)) 0 0 round 6px);
+  transition: clip-path 0.35s ease;
+}
+
+.recap-progress-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: rgba(255, 255, 255, 0.85);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.recap-progress-scale {
+  position: relative;
+  height: 20px;
+  margin-top: 6px;
+}
+
+.scale-mark {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.scale-mark-end {
+  right: 0;
+  transform: none;
+}
+
+/* Full-Width Recap Details Container */
+.recap-detail-card {
+  margin-top: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.recap-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.recap-detail-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.recap-detail-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.recap-detail-status {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background-color: #f1f5f9;
+  color: var(--text-muted);
+}
+
+.recap-detail-status.is-unlocked {
+  background-color: var(--accent-emerald-soft);
+  color: var(--accent-emerald);
+}
+
+.recap-detail-card.is-collapsed .recap-detail-header {
+  margin-bottom: 0;
+}
+
+.recap-detail-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recap-detail-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  background-color: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.recap-detail-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.recap-detail-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+  text-align: right;
+}
+
+/* ==================== PLACEHOLDER CARD ==================== */
+.empty-page-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text-muted);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Responsive layout for mobile screens */
+@media (max-width: 480px) {
+  .menu-grid {
+    gap: 14px;
+  }
+
+  .menu-card {
+    padding: 22px 14px;
+    min-height: 144px;
+  }
+
+  .circle-progress,
+  .circle-progress-svg {
+    width: 54px;
+    height: 54px;
+  }
+
+  .menu-title {
+    font-size: 1.02rem;
+  }
+}
+
