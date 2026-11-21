@@ -1,0 +1,317 @@
+/* ===== Tigabelas — Kalender Kegiatan ===== */
+
+html {
+  scroll-behavior: smooth;
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  touch-action: manipulation;
+}
+
+*, *::before, *::after {
+  touch-action: manipulation;
+}
+
+/* Date inputs: iOS/Safari give them an intrinsic width that ignores width:100%
+   and overflows the form. Force them to honour the container box. */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+/* Custom scrollbar — monochrome */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(212 212 212) transparent;
+}
+.dark * {
+  scrollbar-color: rgb(64 64 64) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(212 212 212);
+  border-radius: 9999px;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgb(64 64 64);
+}
+
+/* Modal animations */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-fade-in {
+  animation: fade-in 0.18s ease-out;
+}
+.animate-pop-in {
+  animation: pop-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes view-fade-slide {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-view {
+  animation: view-fade-slide 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Toast */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.toast {
+  animation: toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Guest Mode Blur Effect */
+.is-guest #calendarCard,
+.is-guest #moviesCard,
+.is-guest #foodCard,
+.is-guest #upcomingEventsCard {
+  filter: blur(8px);
+  pointer-events: none;
+  user-select: none;
+  transition: filter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Profile Dropdown Open Blur Effect across all page containers */
+.is-profile-open main,
+.is-profile-open #headerBrand,
+.is-profile-open #navTabsContainer {
+  filter: blur(8px);
+  pointer-events: none;
+  user-select: none;
+  transition: filter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Running / Marquee text for long titles */
+@keyframes marquee-scroll {
+  0%, 15% {
+    transform: translateX(0);
+  }
+  85%, 100% {
+    transform: translateX(var(--marquee-distance, -50%));
+  }
+}
+.running-text-wrap {
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+}
+.running-text-active {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+  animation: marquee-scroll 6s ease-in-out infinite alternate;
+}
+
+/* Hide number input spinners (kept clean) */
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0);
+  opacity: 0.5;
+  cursor: pointer;
+}
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Focus ring consistency */
+:focus-visible {
+  outline: none;
+}
+
+/* 3D Photo Flip Card for Event Detail */
+.flip-card-container {
+  perspective: 1000px;
+  width: 190px;
+  height: 190px;
+}
+@media (min-width: 640px) {
+  .flip-card-container {
+    width: 210px;
+    height: 210px;
+  }
+}
+
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.55s cubic-bezier(0.34, 1.25, 0.64, 1);
+  transform-style: preserve-3d;
+}
+.flip-card-container.is-flipped .flip-card-inner {
+  transform: rotateY(180deg);
+}
+
+.flip-card-front,
+.flip-card-back {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+.flip-card-front {
+  transform: rotateY(0deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.flip-card-back {
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+}
+
+/* ── White Pink Theme + Pink Accent ─────────────────────────
+   html.user-fany activates the white-pink light mode theme.
+   pink-500 #ec4899 accent · pink-600 #db2777 hover
+   ──────────────────────────────────────────────────────────── */
+
+/* Text selection */
+.user-fany ::selection { background: #fbcfe8; color: #831843; }
+
+/* Remove number input spinners (increase/decrease arrows) */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Fill buttons (black in default light theme) → pink */
+.user-fany #eventForm button[type=submit],
+.user-fany #addMovieForm button[type=submit],
+.user-fany #saveMovieSubmitBtn,
+.user-fany #saveMovieRatingBtn,
+.user-fany #addEventBtn,
+.user-fany [data-edit] {
+  background-color: #ec4899 !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+.user-fany #eventForm button[type=submit]:hover,
+.user-fany #addMovieForm button[type=submit]:hover,
+.user-fany #saveMovieSubmitBtn:hover,
+.user-fany #saveMovieRatingBtn:hover,
+.user-fany #addEventBtn:hover,
+.user-fany [data-edit]:hover {
+  background-color: #db2777 !important;
+}
+
+/* Input / textarea focus → pink (mirrors the neutral focus ring) */
+.user-fany input:focus,
+.user-fany textarea:focus {
+  border-color: #ec4899 !important;
+  box-shadow: 0 0 0 2px rgb(236 72 153 / 0.12) !important;
+}
+
+/* Dynamic accent-fill: selected tags, food btn, today circle, toast */
+.user-fany [data-af] {
+  background-color: #ec4899 !important;
+  color: #fff !important;
+  border-color: #ec4899 !important;
+}
+.user-fany [data-af]:hover { background-color: #db2777 !important; }
+
+/* Event dot indicators on calendar */
+.user-fany [data-ad] { background-color: #ec4899 !important; }
+
+/* Today cell border */
+.user-fany [data-today] { border-color: #ec4899 !important; }
+
+/* Calendar cell hover transition to circle (khusus sel kalender utama, kecualikan hari ini) */
+#calendarGrid [data-day]:not([data-today]) {
+  transition: border-radius 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, border-color 0.2s ease;
+}
+#calendarGrid [data-day]:not([data-today]):hover {
+  border-radius: 9999px !important;
+}
+
+/* Pink theme slider accent */
+.user-fany #photoZoomSlider,
+.user-fany #detailZoomSlider,
+.user-fany #movieRatingSlider {
+  accent-color: #ec4899;
+}
+
+/* Movie Card 2-Line Title Layout with Line 2 Hover Marquee */
+.movie-card-title {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  text-align: center;
+  overflow: hidden;
+  line-height: 1.25;
+}
+
+.movie-title-line1 {
+  display: block;
+  width: 100%;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.movie-title-line2 {
+  display: block;
+  width: 100%;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.movie-line2-span {
+  display: inline-block;
+  will-change: transform;
+}
+
+.movie-line2-span.animate-marquee {
+  animation: movieTitleMarquee 3.5s ease-in-out infinite alternate;
+}
+
+@keyframes movieTitleMarquee {
+  0%, 18% {
+    transform: translateX(0);
+  }
+  82%, 100% {
+    transform: translateX(var(--scroll-dist, -40%));
+  }
+}
